@@ -1,8 +1,11 @@
 # FlowODM
 
-[![Tests](https://github.com/vykhand/flowodm/actions/workflows/test.yml/badge.svg)](https://github.com/vykhand/flowodm/actions/workflows/test.yml)
 [![PyPI version](https://badge.fury.io/py/flowodm.svg)](https://badge.fury.io/py/flowodm)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Python versions](https://img.shields.io/pypi/pyversions/flowodm.svg)](https://pypi.org/project/flowodm/)
+[![Build Status](https://github.com/vykhand/flowodm/workflows/Tests/badge.svg)](https://github.com/vykhand/flowodm/actions)
+[![Coverage](https://codecov.io/gh/vykhand/flowodm/branch/main/graph/badge.svg)](https://codecov.io/gh/vykhand/flowodm)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 A lightweight ODM for Apache Kafka® with Avro schema support.
 
