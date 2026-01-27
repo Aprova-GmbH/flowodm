@@ -70,11 +70,6 @@ jobs:
         env:
           ZOOKEEPER_CLIENT_PORT: 2181
           ZOOKEEPER_TICK_TIME: 2000
-        options: >-
-          --health-cmd "echo ruok | nc localhost 2181 | grep imok"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
       kafka:
         image: confluentinc/cp-kafka:7.5.0
@@ -86,11 +81,6 @@ jobs:
           KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
           KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
           KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-        options: >-
-          --health-cmd "kafka-broker-api-versions --bootstrap-server localhost:9092"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
 
       schema-registry:
         image: confluentinc/cp-schema-registry:7.5.0
@@ -99,11 +89,7 @@ jobs:
         env:
           SCHEMA_REGISTRY_HOST_NAME: schema-registry
           SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
-        options: >-
-          --health-cmd "curl -f http://localhost:8081/subjects || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
+          SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
 
     steps:
       - uses: actions/checkout@v4
@@ -120,8 +106,46 @@ jobs:
 
       - name: Wait for services
         run: |
-          echo "Waiting for Kafka and Schema Registry..."
-          sleep 10
+          echo "Waiting for Kafka and Schema Registry to be ready..."
+          # Install netcat for connection testing
+          sudo apt-get update && sudo apt-get install -y netcat-openbsd
+
+          # Wait for Zookeeper
+          echo "Waiting for Zookeeper..."
+          for i in {1..30}; do
+            if nc -z localhost 2181; then
+              echo "Zookeeper is ready"
+              break
+            fi
+            echo "Waiting for Zookeeper... ($i/30)"
+            sleep 2
+          done
+
+          # Wait for Kafka
+          echo "Waiting for Kafka..."
+          for i in {1..30}; do
+            if nc -z localhost 9092; then
+              echo "Kafka is ready"
+              break
+            fi
+            echo "Waiting for Kafka... ($i/30)"
+            sleep 2
+          done
+
+          # Wait for Schema Registry
+          echo "Waiting for Schema Registry..."
+          for i in {1..30}; do
+            if curl -f http://localhost:8081/subjects > /dev/null 2>&1; then
+              echo "Schema Registry is ready"
+              break
+            fi
+            echo "Waiting for Schema Registry... ($i/30)"
+            sleep 2
+          done
+
+          # Additional settling time
+          echo "All services ready, waiting for stabilization..."
+          sleep 5
 
       - name: Run integration tests
         env:
