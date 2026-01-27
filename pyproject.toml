@@ -28,7 +28,7 @@ classifiers = [
 ]
 dependencies = [
     "pydantic>=2.0",
-    "confluent-kafka>=2.3.0",
+    "confluent-kafka[schemaregistry]>=2.3.0",  # Includes schema registry dependencies
     "fastavro>=1.8.0",
 ]
 

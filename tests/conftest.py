@@ -4,9 +4,10 @@ Pytest configuration and fixtures for FlowODM tests.
 
 from __future__ import annotations
 
-import pytest
 from typing import Any
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock
+
+import pytest
 
 
 class MockMessage:
@@ -62,11 +63,13 @@ class MockProducer:
         callback: Any = None,
         **kwargs: Any,
     ) -> None:
-        self.messages.append({
-            "topic": topic,
-            "value": value,
-            "key": key,
-        })
+        self.messages.append(
+            {
+                "topic": topic,
+                "value": value,
+                "key": key,
+            }
+        )
         if callback:
             # Simulate successful delivery
             callback(None, MockMessage(value, key, topic))
@@ -133,7 +136,9 @@ class MockSchemaRegistryClient:
     def get_latest_version(self, subject: str) -> Any:
         if subject not in self._schemas:
             raise Exception(f"Subject not found: {subject}")
-        return MagicMock(schema=MagicMock(schema_str='{"type": "record", "name": "Test", "fields": []}'))
+        return MagicMock(
+            schema=MagicMock(schema_str='{"type": "record", "name": "Test", "fields": []}')
+        )
 
     def get_version(self, subject: str, version: int) -> Any:
         return self.get_latest_version(subject)
@@ -219,6 +224,7 @@ def sample_avro_schema():
 def sample_user_event_bytes(sample_avro_schema):
     """Sample serialized Avro message bytes."""
     import io
+
     import fastavro
 
     data = {

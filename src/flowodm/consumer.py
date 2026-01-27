@@ -13,7 +13,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import signal
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Type
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any
 
 from flowodm.exceptions import ConsumerError
 from flowodm.settings import BaseSettings, LongRunningSettings
@@ -45,7 +46,7 @@ class ConsumerLoop:
 
     def __init__(
         self,
-        model: Type[FlowBaseModel],
+        model: type[FlowBaseModel],
         handler: Callable[[Any], None],
         settings: BaseSettings | None = None,
         group_id: str | None = None,
@@ -219,7 +220,7 @@ class AsyncConsumerLoop:
 
     def __init__(
         self,
-        model: Type[FlowBaseModel],
+        model: type[FlowBaseModel],
         handler: Callable[[Any], Awaitable[None]],
         settings: BaseSettings | None = None,
         group_id: str | None = None,
@@ -390,7 +391,7 @@ class AsyncConsumerLoop:
 
 
 def consumer_loop(
-    model: Type[FlowBaseModel],
+    model: type[FlowBaseModel],
     settings: BaseSettings | None = None,
     **kwargs: Any,
 ) -> Callable[[Callable[[Any], None]], ConsumerLoop]:
@@ -413,7 +414,7 @@ def consumer_loop(
 
 
 def async_consumer_loop(
-    model: Type[FlowBaseModel],
+    model: type[FlowBaseModel],
     settings: BaseSettings | None = None,
     **kwargs: Any,
 ) -> Callable[[Callable[[Any], Awaitable[None]]], AsyncConsumerLoop]:

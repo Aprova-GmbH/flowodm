@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import io
 import uuid
+from collections.abc import AsyncIterator, Iterator
 from datetime import datetime
-from typing import Any, AsyncIterator, Iterator, TypeVar
+from typing import Any, TypeVar
 
 import fastavro
 from confluent_kafka import Consumer, Message, Producer
@@ -288,7 +289,9 @@ class FlowBaseModel(BaseModel):
         return await get_async_producer()
 
     @classmethod
-    def get_consumer(cls, group_id: str | None = None, settings: BaseSettings | None = None) -> Consumer:
+    def get_consumer(
+        cls, group_id: str | None = None, settings: BaseSettings | None = None
+    ) -> Consumer:
         """Get sync Kafka consumer. Override for custom connection logic."""
         group = group_id or cls._get_consumer_group()
         if not group:

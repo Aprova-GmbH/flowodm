@@ -1,8 +1,7 @@
 """Unit tests for FlowBaseModel."""
 
 from datetime import datetime
-from typing import Optional
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -22,7 +21,7 @@ class UserEvent(FlowBaseModel):
     user_id: str
     action: str
     timestamp: datetime
-    metadata: Optional[str] = None
+    metadata: str | None = None
 
 
 class MinimalModel(FlowBaseModel):

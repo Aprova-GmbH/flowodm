@@ -14,7 +14,6 @@ import argparse
 import importlib
 import sys
 from pathlib import Path
-from typing import Type
 
 from flowodm.exceptions import FlowODMError
 
@@ -98,7 +97,7 @@ def main() -> None:
     )
 
     # List subjects command
-    list_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "list-subjects",
         help="List all Schema Registry subjects",
     )
@@ -153,7 +152,6 @@ def main() -> None:
 
 def cmd_validate(args: argparse.Namespace) -> None:
     """Validate models against schemas."""
-    from flowodm.model import FlowBaseModel
     from flowodm.schema import validate_against_file, validate_against_registry
 
     # Import the module
@@ -314,7 +312,7 @@ def cmd_get_schema(args: argparse.Namespace) -> None:
         print(schema_json)
 
 
-def _load_models_from_module(module_path: str) -> list[Type]:
+def _load_models_from_module(module_path: str) -> list[type]:
     """Load all FlowBaseModel subclasses from a module."""
     from flowodm.model import FlowBaseModel
 
@@ -327,11 +325,7 @@ def _load_models_from_module(module_path: str) -> list[Type]:
     models = []
     for name in dir(module):
         obj = getattr(module, name)
-        if (
-            isinstance(obj, type)
-            and issubclass(obj, FlowBaseModel)
-            and obj is not FlowBaseModel
-        ):
+        if isinstance(obj, type) and issubclass(obj, FlowBaseModel) and obj is not FlowBaseModel:
             # Check if it has a valid Settings class
             try:
                 obj._get_topic()
@@ -342,7 +336,7 @@ def _load_models_from_module(module_path: str) -> list[Type]:
     return models
 
 
-def _load_model_class(class_path: str) -> Type:
+def _load_model_class(class_path: str) -> type:
     """Load a specific model class by full path."""
     from flowodm.model import FlowBaseModel
 

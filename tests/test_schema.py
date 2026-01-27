@@ -2,25 +2,22 @@
 
 import json
 import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 import pytest
 
 from flowodm import FlowBaseModel
 from flowodm.schema import (
     ValidationResult,
-    CompatibilityResult,
-    load_schema_from_file,
-    validate_against_file,
     _avro_type_to_python,
     _types_compatible,
     _validate_model_against_schema,
+    load_schema_from_file,
+    validate_against_file,
 )
 
 
-class TestModel(FlowBaseModel):
-    """Test model for schema validation."""
+class SampleModel(FlowBaseModel):
+    """Sample model for schema validation tests."""
 
     class Settings:
         topic = "test-topic"
@@ -57,14 +54,14 @@ class TestAvroTypeConversion:
 
     def test_primitive_types(self):
         """Test primitive type conversions."""
-        assert _avro_type_to_python("string") == str
-        assert _avro_type_to_python("int") == int
-        assert _avro_type_to_python("long") == int
-        assert _avro_type_to_python("float") == float
-        assert _avro_type_to_python("double") == float
-        assert _avro_type_to_python("boolean") == bool
-        assert _avro_type_to_python("bytes") == bytes
-        assert _avro_type_to_python("null") == type(None)
+        assert _avro_type_to_python("string") is str
+        assert _avro_type_to_python("int") is int
+        assert _avro_type_to_python("long") is int
+        assert _avro_type_to_python("float") is float
+        assert _avro_type_to_python("double") is float
+        assert _avro_type_to_python("boolean") is bool
+        assert _avro_type_to_python("bytes") is bytes
+        assert _avro_type_to_python("null") is type(None)
 
     def test_nullable_types(self):
         """Test nullable union type conversion."""
@@ -90,7 +87,7 @@ class TestValidation:
         """Test validation of a valid model against schema."""
         schema = {
             "type": "record",
-            "name": "TestModel",
+            "name": "SampleModel",
             "fields": [
                 {"name": "user_id", "type": "string"},
                 {"name": "name", "type": "string"},
@@ -99,7 +96,7 @@ class TestValidation:
             ],
         }
 
-        result = _validate_model_against_schema(TestModel, schema)
+        result = _validate_model_against_schema(SampleModel, schema)
 
         assert result.is_valid is True
         assert len(result.errors) == 0
@@ -108,7 +105,7 @@ class TestValidation:
         """Test validation detects missing required fields."""
         schema = {
             "type": "record",
-            "name": "TestModel",
+            "name": "SampleModel",
             "fields": [
                 {"name": "user_id", "type": "string"},
                 {"name": "name", "type": "string"},
@@ -117,7 +114,7 @@ class TestValidation:
             ],
         }
 
-        result = _validate_model_against_schema(TestModel, schema)
+        result = _validate_model_against_schema(SampleModel, schema)
 
         assert result.is_valid is False
         assert any("email" in error for error in result.errors)
@@ -126,7 +123,7 @@ class TestValidation:
         """Test validation detects extra fields in model."""
         schema = {
             "type": "record",
-            "name": "TestModel",
+            "name": "SampleModel",
             "fields": [
                 {"name": "user_id", "type": "string"},
                 {"name": "message_id", "type": "string"},
@@ -134,7 +131,7 @@ class TestValidation:
             ],
         }
 
-        result = _validate_model_against_schema(TestModel, schema)
+        result = _validate_model_against_schema(SampleModel, schema)
 
         assert result.is_valid is False
         assert any("name" in error for error in result.errors)
@@ -143,7 +140,7 @@ class TestValidation:
         """Test validation allows missing optional fields."""
         schema = {
             "type": "record",
-            "name": "TestModel",
+            "name": "SampleModel",
             "fields": [
                 {"name": "user_id", "type": "string"},
                 {"name": "name", "type": "string"},
@@ -153,7 +150,7 @@ class TestValidation:
             ],
         }
 
-        result = _validate_model_against_schema(TestModel, schema)
+        result = _validate_model_against_schema(SampleModel, schema)
 
         # Should have warning but no error for optional field
         assert result.is_valid is True
@@ -161,6 +158,7 @@ class TestValidation:
 
     def test_validate_against_file(self, sample_avro_schema):
         """Test validate_against_file function."""
+
         # Create a model that matches the sample schema
         class MatchingModel(FlowBaseModel):
             class Settings:

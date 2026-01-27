@@ -307,9 +307,7 @@ class KafkaConnection:
                 self._async_consumers[consumer_key] = consumer
             except ImportError:
                 # Fall back to sync consumer for older versions
-                self._async_consumers[consumer_key] = self.get_consumer(
-                    group_id, topics, settings
-                )
+                self._async_consumers[consumer_key] = self.get_consumer(group_id, topics, settings)
 
         return self._async_consumers[consumer_key]
 

@@ -7,13 +7,12 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Type
+from typing import TYPE_CHECKING, Any
 
 from flowodm.connection import get_schema_registry
 from flowodm.exceptions import (
     SchemaCompatibilityError,
     SchemaRegistryError,
-    SchemaValidationError,
 )
 
 if TYPE_CHECKING:
@@ -93,7 +92,7 @@ def generate_model_from_schema(
     topic: str,
     class_name: str | None = None,
     consumer_group: str | None = None,
-) -> Type[FlowBaseModel]:
+) -> type[FlowBaseModel]:
     """
     Generate a FlowBaseModel subclass from an Avro schema.
 
@@ -170,7 +169,7 @@ def generate_model_from_registry(
     version: str | int = "latest",
     class_name: str | None = None,
     consumer_group: str | None = None,
-) -> Type[FlowBaseModel]:
+) -> type[FlowBaseModel]:
     """
     Generate a FlowBaseModel subclass from Schema Registry.
 
@@ -248,7 +247,7 @@ def _avro_type_to_python(avro_type: Any) -> type:
 
 
 def validate_against_file(
-    model_class: Type[FlowBaseModel],
+    model_class: type[FlowBaseModel],
     schema_path: str | Path,
 ) -> ValidationResult:
     """
@@ -266,7 +265,7 @@ def validate_against_file(
 
 
 def validate_against_registry(
-    model_class: Type[FlowBaseModel],
+    model_class: type[FlowBaseModel],
     subject: str,
     version: str | int = "latest",
 ) -> ValidationResult:
@@ -286,7 +285,7 @@ def validate_against_registry(
 
 
 def _validate_model_against_schema(
-    model_class: Type[FlowBaseModel],
+    model_class: type[FlowBaseModel],
     schema: dict[str, Any],
 ) -> ValidationResult:
     """
@@ -354,25 +353,35 @@ def _is_nullable_avro_type(avro_type: Any) -> bool:
 
 def _types_compatible(python_type: Any, avro_type: Any) -> bool:
     """Check if Python type is compatible with Avro type."""
-    # Handle optional types
-    origin = getattr(python_type, "__origin__", None)
-    if origin is type(None):
-        return _is_nullable_avro_type(avro_type)
-
-    # Handle Union types (Optional)
+    # Handle Union types (Optional / int | None)
     if hasattr(python_type, "__args__"):
         args = python_type.__args__
-        if type(None) in args:
-            # It's Optional[X], check the non-None type
-            non_none_types = [a for a in args if a is not type(None)]
+        python_is_nullable = type(None) in args
+        non_none_types = [a for a in args if a is not type(None)]
+
+        # For nullable Python type, Avro should also be nullable
+        if python_is_nullable:
+            # If Python is nullable, get the base Avro type
+            if isinstance(avro_type, list):
+                avro_base_types = [t for t in avro_type if t != "null"]
+                if non_none_types and avro_base_types:
+                    # Check if the non-null types are compatible
+                    return _types_compatible(non_none_types[0], avro_base_types[0])
+
             if non_none_types:
                 return _types_compatible(non_none_types[0], avro_type)
+
+    # Handle nullable Avro type with non-nullable Python type
+    if isinstance(avro_type, list) and "null" in avro_type:
+        non_null_avro_types = [t for t in avro_type if t != "null"]
+        if non_null_avro_types:
+            return _types_compatible(python_type, non_null_avro_types[0])
 
     # Get expected Python type from Avro
     expected_python_type = _avro_type_to_python(avro_type)
 
     # Handle Optional expected types
-    if hasattr(expected_python_type, "__origin__"):
+    if hasattr(expected_python_type, "__args__"):
         args = getattr(expected_python_type, "__args__", ())
         if type(None) in args:
             non_none_types = [a for a in args if a is not type(None)]
@@ -392,7 +401,7 @@ def _types_compatible(python_type: Any, avro_type: Any) -> bool:
 
 
 def check_compatibility(
-    model_class: Type[FlowBaseModel],
+    model_class: type[FlowBaseModel],
     subject: str,
     compatibility_level: str = "BACKWARD",
 ) -> CompatibilityResult:
