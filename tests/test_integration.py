@@ -23,7 +23,6 @@ from flowodm.consumer import AsyncConsumerLoop, ConsumerLoop
 from flowodm.exceptions import DeserializationError, ProducerError
 from flowodm.settings import BaseSettings
 
-
 # ==================== Test Model Factories ====================
 
 
@@ -122,12 +121,15 @@ class TestSyncProduceConsume:
 
         # Give Kafka a moment to commit
         import time
+
         time.sleep(0.2)
 
         # Consume message with explicit "earliest" setting
         consumed = TestModel.consume_one(timeout=10.0, settings=BaseSettings())
 
-        assert consumed is not None, "Failed to consume message - check Kafka consumer offset strategy"
+        assert (
+            consumed is not None
+        ), "Failed to consume message - check Kafka consumer offset strategy"
         assert consumed.event_id == event.event_id
         assert consumed.event_type == event.event_type
         assert consumed.payload == event.payload  # JSON string comparison
@@ -153,6 +155,7 @@ class TestSyncProduceConsume:
 
         # Give Kafka a moment to commit
         import time
+
         time.sleep(0.2)
 
         # Consume messages
@@ -184,6 +187,7 @@ class TestSyncProduceConsume:
 
         # Give Kafka a moment to commit
         import time
+
         time.sleep(0.2)
 
         # Consume and verify
@@ -203,6 +207,7 @@ class TestSyncProduceConsume:
 
         # Give Kafka a moment to commit
         import time
+
         time.sleep(0.2)
 
         # Consume and verify
@@ -306,6 +311,7 @@ class TestConsumerLoops:
 
         # Give Kafka a moment to commit
         import time
+
         time.sleep(0.2)
 
         # Process with consumer loop
@@ -412,8 +418,7 @@ class TestSchemaRegistry:
 
         # Consume should work with same schema
         consumed = IntegrationTestEvent.consume_one(
-            timeout=10.0,
-            group_id=f"test-group-{uuid.uuid4().hex[:8]}"
+            timeout=10.0, group_id=f"test-group-{uuid.uuid4().hex[:8]}"
         )
         assert consumed is not None
         assert consumed.event_id == unique_id
@@ -452,9 +457,7 @@ class TestErrorHandling:
 class TestConnectionManagement:
     """Test connection lifecycle management."""
 
-    def test_connection_singleton(
-        self, kafka_bootstrap_servers: str, schema_registry_url: str
-    ):
+    def test_connection_singleton(self, kafka_bootstrap_servers: str, schema_registry_url: str):
         """Test that KafkaConnection is a singleton."""
         conn1 = connect(
             bootstrap_servers=kafka_bootstrap_servers,
@@ -478,6 +481,7 @@ class TestConnectionManagement:
 
         # Give Kafka a moment to commit
         import time
+
         time.sleep(0.2)
 
         # Verify both messages were produced
