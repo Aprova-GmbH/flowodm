@@ -12,15 +12,13 @@ import asyncio
 import json
 import os
 import uuid
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 
 import pytest
 
 from flowodm import FlowBaseModel
 from flowodm.connection import KafkaConnection, connect
 from flowodm.consumer import AsyncConsumerLoop, ConsumerLoop
-from flowodm.exceptions import DeserializationError, ProducerError
 from flowodm.settings import BaseSettings
 
 # ==================== Test Model Factories ====================
@@ -112,7 +110,7 @@ class TestSyncProduceConsume:
         event = TestModel(
             event_id=f"evt-{uuid.uuid4().hex[:8]}",
             event_type="test_action",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             payload=json.dumps({"key": "value", "count": 42}),
         )
 
@@ -144,7 +142,7 @@ class TestSyncProduceConsume:
             TestModel(
                 event_id=f"evt-batch-{i}",
                 event_type="batch_test",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 payload=json.dumps({"index": i}),
             )
             for i in range(5)
@@ -179,7 +177,7 @@ class TestSyncProduceConsume:
         event = TestModel(
             event_id=unique_id,
             event_type="key_test",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         # Produce with key
@@ -233,7 +231,7 @@ class TestAsyncProduceConsume:
         event = TestModel(
             event_id=f"evt-async-{uuid.uuid4().hex[:8]}",
             event_type="test_async",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             payload=json.dumps({"async": True}),
         )
 
@@ -260,7 +258,7 @@ class TestAsyncProduceConsume:
             TestModel(
                 event_id=f"async-evt-{i}",
                 event_type="async_batch_test",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 payload=json.dumps({"index": i}),
             )
             for i in range(3)
@@ -301,7 +299,7 @@ class TestConsumerLoops:
             TestModel(
                 event_id=f"loop-evt-{i}",
                 event_type="loop_test",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
             )
             for i in range(3)
         ]
@@ -344,7 +342,7 @@ class TestConsumerLoops:
             TestModel(
                 event_id=f"async-loop-evt-{i}",
                 event_type="async_loop_test",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
             )
             for i in range(3)
         ]
@@ -385,10 +383,12 @@ class TestSchemaRegistry:
 
     def test_schema_subject_registration(self, kafka_connection: KafkaConnection):
         """Test that producing registers schema in Schema Registry."""
-        event = IntegrationTestEvent(
+        TestModel = create_test_event_model()
+
+        event = TestModel(
             event_id=f"schema-test-{uuid.uuid4().hex[:8]}",
             event_type="schema_test",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         # Produce message (should register schema)
@@ -396,7 +396,7 @@ class TestSchemaRegistry:
 
         # Verify schema is registered
         registry = kafka_connection.schema_registry
-        topic = IntegrationTestEvent._get_topic()
+        topic = TestModel._get_topic()
         subject = f"{topic}-value"
 
         # Get subjects - this should include our subject
@@ -407,19 +407,19 @@ class TestSchemaRegistry:
         """Test schema compatibility checking."""
         # This test verifies that Schema Registry is working
         # In a real scenario, you'd test schema evolution
+        TestModel = create_test_event_model()
+
         unique_id = f"compat-test-{uuid.uuid4().hex[:8]}"
-        event = IntegrationTestEvent(
+        event = TestModel(
             event_id=unique_id,
             event_type="compatibility_test",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         event.produce()
 
         # Consume should work with same schema
-        consumed = IntegrationTestEvent.consume_one(
-            timeout=10.0, group_id=f"test-group-{uuid.uuid4().hex[:8]}"
-        )
+        consumed = TestModel.consume_one(timeout=10.0, settings=BaseSettings())
         assert consumed is not None
         assert consumed.event_id == unique_id
 
