@@ -53,7 +53,8 @@ def load_schema_from_file(path: str | Path) -> dict[str, Any]:
     """
     path = Path(path)
     with open(path) as f:
-        return json.load(f)
+        result: dict[str, Any] = json.load(f)
+        return result
 
 
 def load_schema_from_registry(
@@ -81,7 +82,11 @@ def load_schema_from_registry(
         else:
             schema_version = registry.get_version(subject, int(version))
 
-        return json.loads(schema_version.schema.schema_str)
+        schema_str = schema_version.schema.schema_str
+        if not schema_str:
+            raise ValueError("Schema string is empty")
+        schema_dict: dict[str, Any] = json.loads(schema_str)
+        return schema_dict
 
     except Exception as e:
         raise SchemaRegistryError(f"Failed to load schema from registry: {e}") from e
@@ -145,7 +150,8 @@ def generate_model_from_schema(
 
     # Create Settings class
     class GeneratedSettings:
-        pass
+        topic: str | None = None
+        consumer_group: str | None = None
 
     GeneratedSettings.topic = topic
     GeneratedSettings.consumer_group = consumer_group
@@ -192,7 +198,7 @@ def generate_model_from_registry(
     )
 
 
-def _avro_type_to_python(avro_type: Any) -> type:
+def _avro_type_to_python(avro_type: Any) -> Any:
     """Convert Avro type to Python type annotation."""
     # Handle union types (nullable)
     if isinstance(avro_type, list):
@@ -348,7 +354,7 @@ def _is_nullable_avro_type(avro_type: Any) -> bool:
     """Check if Avro type is nullable (union with null)."""
     if isinstance(avro_type, list):
         return "null" in avro_type
-    return avro_type == "null"
+    return bool(avro_type == "null")
 
 
 def _types_compatible(python_type: Any, avro_type: Any) -> bool:
@@ -397,7 +403,7 @@ def _types_compatible(python_type: Any, avro_type: Any) -> bool:
         return True
 
     # Fallback - be permissive
-    return expected_python_type == Any
+    return bool(expected_python_type == Any)
 
 
 def check_compatibility(

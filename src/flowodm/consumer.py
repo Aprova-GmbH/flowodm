@@ -87,7 +87,7 @@ class ConsumerLoop:
         self.poll_timeout = poll_timeout
 
         self._running = False
-        self._consumer = None
+        self._consumer: Any = None
 
     def _setup_signal_handlers(self) -> None:
         """Setup signal handlers for graceful shutdown."""
@@ -162,7 +162,10 @@ class ConsumerLoop:
         while retries <= self.max_retries:
             try:
                 # Deserialize message
-                instance = self.model._deserialize_avro(msg.value())
+                value = msg.value()
+                if value is None:
+                    return
+                instance = self.model._deserialize_avro(value)
 
                 # Call handler
                 self.handler(instance)
@@ -264,7 +267,7 @@ class AsyncConsumerLoop:
         self.poll_timeout = poll_timeout
 
         self._running = False
-        self._consumer = None
+        self._consumer: Any = None
         self._semaphore: asyncio.Semaphore | None = None
 
     def stop(self) -> None:
@@ -354,7 +357,10 @@ class AsyncConsumerLoop:
         while retries <= self.max_retries:
             try:
                 # Deserialize message
-                instance = self.model._deserialize_avro(msg.value())
+                value = msg.value()
+                if value is None:
+                    return
+                instance = self.model._deserialize_avro(value)
 
                 # Call handler
                 await self.handler(instance)

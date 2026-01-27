@@ -96,7 +96,7 @@ class FlowBaseModel(BaseModel):
         if settings is None:
             raise SettingsError(f"{cls.__name__} must define an inner Settings class")
 
-        topic = getattr(settings, "topic", None)
+        topic: str | None = getattr(settings, "topic", None)
         if not topic:
             raise SettingsError(f"{cls.__name__}.Settings must define 'topic'")
 
@@ -106,7 +106,7 @@ class FlowBaseModel(BaseModel):
     def _get_schema_subject(cls) -> str:
         """Get schema subject (defaults to {topic}-value)."""
         settings = getattr(cls, "Settings", None)
-        subject = getattr(settings, "schema_subject", None) if settings else None
+        subject: str | None = getattr(settings, "schema_subject", None) if settings else None
         if subject:
             return subject
         return f"{cls._get_topic()}-value"
@@ -145,7 +145,8 @@ class FlowBaseModel(BaseModel):
             with open(schema_path) as f:
                 import json
 
-                return json.load(f)
+                schema_from_file: dict[str, Any] = json.load(f)
+                return schema_from_file
 
         # Try loading from Schema Registry
         try:
@@ -154,7 +155,11 @@ class FlowBaseModel(BaseModel):
             schema = registry.get_latest_version(subject)
             import json
 
-            return json.loads(schema.schema.schema_str)
+            schema_str = schema.schema.schema_str
+            if not schema_str:
+                raise ValueError("Schema string is empty")
+            schema_from_registry: dict[str, Any] = json.loads(schema_str)
+            return schema_from_registry
         except Exception:
             pass
 
@@ -169,6 +174,7 @@ class FlowBaseModel(BaseModel):
             avro_type = cls._python_type_to_avro(field_info.annotation)
 
             # Handle optional fields
+            field_type: str | dict[str, Any] | list[str | dict[str, Any]]
             if field_info.is_required():
                 field_type = avro_type
             else:
@@ -259,7 +265,7 @@ class FlowBaseModel(BaseModel):
         input_stream = io.BytesIO(data)
 
         try:
-            record = fastavro.schemaless_reader(input_stream, schema)
+            record: dict[str, Any] = fastavro.schemaless_reader(input_stream, schema)  # type: ignore[assignment,call-arg]
             return cls._from_avro_dict(record)
         except Exception as e:
             raise DeserializationError(f"Failed to deserialize from Avro: {e}") from e
@@ -445,7 +451,10 @@ class FlowBaseModel(BaseModel):
             return None
 
         try:
-            instance = cls._deserialize_avro(msg.value())
+            value = msg.value()
+            if value is None:
+                return None
+            instance = cls._deserialize_avro(value)
             consumer.commit(msg)
             return instance
         except Exception:
@@ -481,7 +490,10 @@ class FlowBaseModel(BaseModel):
                 continue
 
             try:
-                instance = cls._deserialize_avro(msg.value())
+                value = msg.value()
+                if value is None:
+                    continue
+                instance = cls._deserialize_avro(value)
                 yield instance
                 consumer.commit(msg)
             except Exception:
@@ -520,7 +532,10 @@ class FlowBaseModel(BaseModel):
                 continue
 
             try:
-                instance = cls._deserialize_avro(msg.value())
+                value = msg.value()
+                if value is None:
+                    continue
+                instance = cls._deserialize_avro(value)
                 results.append(instance)
                 consumer.commit(msg)
             except Exception:
@@ -553,7 +568,10 @@ class FlowBaseModel(BaseModel):
             return None
 
         try:
-            instance = cls._deserialize_avro(msg.value())
+            value = msg.value()
+            if value is None:
+                return None
+            instance = cls._deserialize_avro(value)
             consumer.commit(msg)
             return instance
         except Exception:
@@ -583,7 +601,10 @@ class FlowBaseModel(BaseModel):
                 continue
 
             try:
-                instance = cls._deserialize_avro(msg.value())
+                value = msg.value()
+                if value is None:
+                    continue
+                instance = cls._deserialize_avro(value)
                 yield instance
                 consumer.commit(msg)
             except Exception:
@@ -614,7 +635,10 @@ class FlowBaseModel(BaseModel):
                 continue
 
             try:
-                instance = cls._deserialize_avro(msg.value())
+                value = msg.value()
+                if value is None:
+                    continue
+                instance = cls._deserialize_avro(value)
                 results.append(instance)
                 consumer.commit(msg)
             except Exception:

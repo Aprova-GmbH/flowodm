@@ -255,7 +255,7 @@ class KafkaConnection:
         """
         if self._async_producer is None:
             try:
-                from confluent_kafka import AIOProducer
+                from confluent_kafka import AIOProducer  # type: ignore[attr-defined]
 
                 config = self._get_base_kafka_config()
                 config.update(
@@ -287,7 +287,7 @@ class KafkaConnection:
 
         if consumer_key not in self._async_consumers:
             try:
-                from confluent_kafka import AIOConsumer
+                from confluent_kafka import AIOConsumer  # type: ignore[attr-defined]
 
                 config = self._get_base_kafka_config()
                 config["group.id"] = group_id

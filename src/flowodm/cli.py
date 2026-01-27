@@ -14,6 +14,7 @@ import argparse
 import importlib
 import sys
 from pathlib import Path
+from typing import Any
 
 from flowodm.exceptions import FlowODMError
 
@@ -168,7 +169,7 @@ def cmd_validate(args: argparse.Namespace) -> None:
 
     for model_class in models:
         model_name = model_class.__name__
-        subject = model_class._get_schema_subject()
+        subject = model_class._get_schema_subject()  # type: ignore[attr-defined]
 
         if args.registry:
             # Validate against Schema Registry
@@ -258,7 +259,7 @@ def cmd_check_compatibility(args: argparse.Namespace) -> None:
         print("=" * 60)
 
         for model_class in models:
-            subject = model_class._get_schema_subject()
+            subject = model_class._get_schema_subject()  # type: ignore[attr-defined]
 
             try:
                 result = check_compatibility(model_class, subject, args.level)
@@ -336,7 +337,7 @@ def _load_models_from_module(module_path: str) -> list[type]:
     return models
 
 
-def _load_model_class(class_path: str) -> type:
+def _load_model_class(class_path: str) -> Any:
     """Load a specific model class by full path."""
     from flowodm.model import FlowBaseModel
 
