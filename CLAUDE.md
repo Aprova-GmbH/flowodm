@@ -70,9 +70,10 @@ docker-compose -f docker-compose.test.yml down
 ```
 
 **Important:**
-- **Unit tests** (`pytest -m unit`) use mocks and NEVER require Kafka
-- **Integration tests** (`pytest -m integration`) REQUIRE real Kafka and will FAIL without it
+- **Unit tests** (`pytest -m unit`) use mocks and NEVER require Kafka (34 tests)
+- **Integration tests** (`pytest -m integration`) REQUIRE real Kafka and will FAIL without it (14 tests)
 - For local development, run unit tests only (no Kafka needed)
+- Integration tests cover: sync/async produce/consume, consumer loops, Schema Registry, error handling
 
 ## Architecture
 
@@ -129,13 +130,23 @@ class UserEvent(FlowBaseModel):
 ## Testing Strategy
 
 **Strict Separation: Unit vs Integration**
-- **Unit Tests** (`@pytest.mark.unit`): Use mock producers/consumers, test logic only
-- **Integration Tests** (`@pytest.mark.integration`): Require real Kafka, test end-to-end
+- **Unit Tests** (`@pytest.mark.unit`): Use mock producers/consumers, test logic only (34 tests)
+- **Integration Tests** (`@pytest.mark.integration`): Require real Kafka, test end-to-end (14 tests)
 
 **Test Files**
-- `conftest.py`: Mock fixtures (MockProducer, MockConsumer, MockSchemaRegistry)
-- `test_model.py`: Unit tests for FlowBaseModel
-- `test_schema.py`: Unit tests for schema utilities
+- `conftest.py`: Mock fixtures (MockProducer, MockConsumer, MockSchemaRegistry) + connection reset
+- `test_model.py`: Unit tests for FlowBaseModel (model creation, settings, serialization, schema gen)
+- `test_schema.py`: Unit tests for schema utilities (loading, validation, type conversion)
+- `test_integration.py`: Integration tests with real Kafka (produce/consume, loops, Schema Registry)
+
+**Integration Test Coverage**
+- Sync and async produce/consume operations
+- Multiple message batch operations
+- Message key handling
+- Consumer loops (sync and async)
+- Schema Registry registration and compatibility
+- Error handling and timeouts
+- Connection lifecycle management
 
 ## Design Philosophy
 
