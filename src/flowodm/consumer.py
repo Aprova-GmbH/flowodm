@@ -308,12 +308,15 @@ class AsyncConsumerLoop:
                 if hasattr(self._consumer, "poll_async"):
                     msg = await self._consumer.poll_async(self.poll_timeout)
                 else:
-                    msg = self._consumer.poll(self.poll_timeout)
+                    # Run sync poll in thread executor to avoid blocking event loop
+                    msg = await asyncio.to_thread(self._consumer.poll, self.poll_timeout)
 
                 if msg is None:
                     # Clean up completed tasks
                     done = {t for t in pending_tasks if t.done()}
                     pending_tasks -= done
+                    # Yield to allow other tasks to run
+                    await asyncio.sleep(0)
                     continue
 
                 if msg.error():
@@ -321,9 +324,9 @@ class AsyncConsumerLoop:
                     continue
 
                 # Process message with concurrency limit
-                async with self._semaphore:
-                    task = asyncio.create_task(self._process_message(msg))
-                    pending_tasks.add(task)
+                await self._semaphore.acquire()
+                task = asyncio.create_task(self._process_message_with_semaphore(msg))
+                pending_tasks.add(task)
 
             # Wait for pending tasks on shutdown
             if pending_tasks:
@@ -349,6 +352,14 @@ class AsyncConsumerLoop:
                     pass
 
             logger.info("Async consumer loop stopped")
+
+    async def _process_message_with_semaphore(self, msg: Any) -> None:
+        """Process message and release semaphore when done."""
+        try:
+            await self._process_message(msg)
+        finally:
+            if self._semaphore:
+                self._semaphore.release()
 
     async def _process_message(self, msg: Any) -> None:
         """Process a single message with retry logic."""

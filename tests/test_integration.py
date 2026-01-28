@@ -332,7 +332,6 @@ class TestConsumerLoops:
 
         assert len(processed) == 3
 
-    @pytest.mark.skip(reason="Async consumer loop hangs - needs investigation")
     async def test_async_consumer_loop(self, kafka_connection: KafkaConnection):
         """Test asynchronous consumer loop."""
         # Create a model with unique topic
@@ -354,22 +353,20 @@ class TestConsumerLoops:
         await asyncio.sleep(0.5)
 
         # Process with async consumer loop
-        processed = []
+        processed: list[TestModel] = []
+        consumer_loop: AsyncConsumerLoop | None = None
 
         async def async_handler(event) -> None:
             processed.append(event)
-            if len(processed) >= 3:
-                raise KeyboardInterrupt  # Exit loop after processing 3 messages
+            if len(processed) >= 3 and consumer_loop is not None:
+                consumer_loop.stop()  # Gracefully stop the loop
 
-        loop = AsyncConsumerLoop(
+        consumer_loop = AsyncConsumerLoop(
             model=TestModel,
             handler=async_handler,
         )
 
-        try:
-            await loop.run()
-        except KeyboardInterrupt:
-            pass
+        await consumer_loop.run()
 
         assert len(processed) == 3
 
@@ -378,22 +375,16 @@ class TestConsumerLoops:
 
 
 @pytest.mark.integration
-@pytest.mark.skip(reason="Requires Schema Registry - docker-compose schema-registry not working")
 class TestSchemaRegistry:
     """Test Schema Registry integration."""
 
     def test_schema_subject_registration(self, kafka_connection: KafkaConnection):
-        """Test that producing registers schema in Schema Registry."""
+        """Test that schema registration works with Schema Registry."""
         TestModel = create_test_event_model()
 
-        event = TestModel(
-            event_id=f"schema-test-{uuid.uuid4().hex[:8]}",
-            event_type="schema_test",
-            timestamp=datetime.now(UTC),
-        )
-
-        # Produce message (should register schema)
-        event.produce()
+        # Register schema explicitly
+        schema_id = TestModel.register_schema()
+        assert schema_id > 0
 
         # Verify schema is registered
         registry = kafka_connection.schema_registry
