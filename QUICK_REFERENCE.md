@@ -38,7 +38,7 @@ git push origin vX.Y.Z
 
 ```bash
 # Check GitHub Actions
-open https://github.com/vykhand/flowodm/actions
+open https://github.com/Aprova-GmbH/flowodm/actions
 
 # Check PyPI
 open https://pypi.org/project/flowodm/
@@ -433,10 +433,10 @@ open _build/html/index.html
 
 ## Important Links
 
-- **Repository**: https://github.com/vykhand/flowodm
+- **Repository**: https://github.com/Aprova-GmbH/flowodm
 - **PyPI**: https://pypi.org/project/flowodm/
 - **Documentation**: https://flowodm.readthedocs.io
-- **Issues**: https://github.com/vykhand/flowodm/issues
+- **Issues**: https://github.com/Aprova-GmbH/flowodm/issues
 
 ---
 

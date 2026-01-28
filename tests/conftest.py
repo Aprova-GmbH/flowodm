@@ -237,3 +237,178 @@ def sample_user_event_bytes(sample_avro_schema):
     output = io.BytesIO()
     fastavro.schemaless_writer(output, sample_avro_schema, data)
     return output.getvalue()
+
+
+@pytest.fixture
+def mock_consumer_with_message():
+    """Create a mock consumer with a test message."""
+    import io
+
+    import fastavro
+
+    from flowodm import FlowBaseModel
+
+    # Create a minimal model for testing
+    class MinimalModel(FlowBaseModel):
+        class Settings:
+            topic = "minimal-topic"
+
+        name: str
+
+    # Serialize a test message
+    instance = MinimalModel(name="test")
+    schema = instance._generate_avro_schema()
+    data = instance._to_avro_dict()
+
+    output = io.BytesIO()
+    fastavro.schemaless_writer(output, schema, data)
+    value_bytes = output.getvalue()
+
+    message = MockMessage(value=value_bytes)
+    consumer = MockConsumer(messages=[message])
+    return consumer
+
+
+@pytest.fixture
+def mock_consumer_no_message():
+    """Create a mock consumer with no messages."""
+    return MockConsumer(messages=[])
+
+
+@pytest.fixture
+def mock_consumer_with_batch():
+    """Create a mock consumer with multiple messages."""
+    import io
+
+    import fastavro
+
+    from flowodm import FlowBaseModel
+
+    class MinimalModel(FlowBaseModel):
+        class Settings:
+            topic = "minimal-topic"
+
+        name: str
+
+    schema = MinimalModel._generate_avro_schema()
+    messages = []
+
+    for i in range(3):
+        instance = MinimalModel(name=f"test-{i}")
+        data = instance._to_avro_dict()
+
+        output = io.BytesIO()
+        fastavro.schemaless_writer(output, schema, data)
+        value_bytes = output.getvalue()
+
+        messages.append(MockMessage(value=value_bytes))
+
+    return MockConsumer(messages=messages)
+
+
+class MockAsyncProducer:
+    """Mock async Kafka producer for unit tests."""
+
+    def __init__(self):
+        self.messages: list[dict[str, Any]] = []
+
+    async def produce_async(
+        self,
+        topic: str,
+        value: bytes,
+        key: bytes | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self.messages.append(
+            {
+                "topic": topic,
+                "value": value,
+                "key": key,
+            }
+        )
+
+    def produce(
+        self,
+        topic: str,
+        value: bytes,
+        key: bytes | None = None,
+        callback: Any = None,
+        **kwargs: Any,
+    ) -> None:
+        """Fallback sync produce method."""
+        self.messages.append(
+            {
+                "topic": topic,
+                "value": value,
+                "key": key,
+            }
+        )
+
+    def poll(self, timeout: float = 0) -> int:
+        return 0
+
+
+class MockAsyncConsumer:
+    """Mock async Kafka consumer for unit tests."""
+
+    def __init__(self, messages: list[MockMessage] | None = None):
+        self._messages = messages or []
+        self._index = 0
+        self._committed: list[MockMessage] = []
+
+    async def poll_async(self, timeout: float = 1.0) -> MockMessage | None:
+        if self._index < len(self._messages):
+            msg = self._messages[self._index]
+            self._index += 1
+            return msg
+        return None
+
+    def poll(self, timeout: float = 1.0) -> MockMessage | None:
+        """Fallback sync poll method."""
+        if self._index < len(self._messages):
+            msg = self._messages[self._index]
+            self._index += 1
+            return msg
+        return None
+
+    def commit(self, message: MockMessage | None = None, asynchronous: bool = True) -> None:
+        if message:
+            self._committed.append(message)
+
+    def close(self) -> None:
+        pass
+
+
+@pytest.fixture
+def mock_async_producer():
+    """Create a mock async Kafka producer."""
+    return MockAsyncProducer()
+
+
+@pytest.fixture
+def mock_async_consumer_with_message():
+    """Create a mock async consumer with a test message."""
+    import io
+
+    import fastavro
+
+    from flowodm import FlowBaseModel
+
+    class MinimalModel(FlowBaseModel):
+        class Settings:
+            topic = "minimal-topic"
+
+        name: str
+
+    # Serialize a test message
+    instance = MinimalModel(name="test")
+    schema = instance._generate_avro_schema()
+    data = instance._to_avro_dict()
+
+    output = io.BytesIO()
+    fastavro.schemaless_writer(output, schema, data)
+    value_bytes = output.getvalue()
+
+    message = MockMessage(value=value_bytes)
+    consumer = MockAsyncConsumer(messages=[message])
+    return consumer

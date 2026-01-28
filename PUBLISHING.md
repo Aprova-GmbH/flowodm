@@ -2,7 +2,7 @@
 
 This document contains all instructions for publishing and maintaining the FlowODM package.
 
-Repository: https://github.com/vykhand/flowodm
+Repository: https://github.com/Aprova-GmbH/flowodm
 
 ## 1. Publishing to PyPI
 
@@ -171,9 +171,9 @@ git push origin v0.2.0
 
 ### 3.6 Verify Release
 
-1. **GitHub Actions:** Check https://github.com/vykhand/flowodm/actions
+1. **GitHub Actions:** Check https://github.com/Aprova-GmbH/flowodm/actions
 2. **PyPI:** Verify at https://pypi.org/project/flowodm/
-3. **GitHub Release:** Check https://github.com/vykhand/flowodm/releases
+3. **GitHub Release:** Check https://github.com/Aprova-GmbH/flowodm/releases
 4. **Documentation:** Verify at https://flowodm.readthedocs.io
 
 ### 3.7 Test Installation
@@ -227,7 +227,7 @@ Before creating any release, verify:
 ## 6. Troubleshooting
 
 ### GitHub Actions Fails
-- Check workflow logs: https://github.com/vykhand/flowodm/actions
+- Check workflow logs: https://github.com/Aprova-GmbH/flowodm/actions
 - Verify `PYPI_API_TOKEN` secret is set correctly
 - Ensure PyPI token has correct scope
 
@@ -276,4 +276,4 @@ This makes the release process much faster and simpler than libraries requiring 
 
 For questions about publishing or releases:
 - Email: andrey@aprova.ai
-- GitHub Issues: https://github.com/vykhand/flowodm/issues
+- GitHub Issues: https://github.com/Aprova-GmbH/flowodm/issues

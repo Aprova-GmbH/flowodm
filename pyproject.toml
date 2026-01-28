@@ -51,10 +51,10 @@ dev = [
 flowodm = "flowodm.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/vykhand/flowodm"
+Homepage = "https://github.com/Aprova-GmbH/flowodm"
 Documentation = "https://flowodm.readthedocs.io"
-Repository = "https://github.com/vykhand/flowodm"
-Changelog = "https://github.com/vykhand/flowodm/blob/main/CHANGELOG.md"
+Repository = "https://github.com/Aprova-GmbH/flowodm"
+Changelog = "https://github.com/Aprova-GmbH/flowodm/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/flowodm"]

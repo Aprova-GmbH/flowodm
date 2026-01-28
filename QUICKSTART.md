@@ -14,7 +14,7 @@ pip install flowodm
 
 ```bash
 # Clone the repository
-git clone https://github.com/vykhand/flowodm.git
+git clone https://github.com/Aprova-GmbH/flowodm.git
 cd flowodm
 
 # Install in development mode
@@ -486,5 +486,5 @@ docker run -d \
 ## Getting Help
 
 - **Documentation**: https://flowodm.readthedocs.io
-- **GitHub Issues**: https://github.com/vykhand/flowodm/issues
+- **GitHub Issues**: https://github.com/Aprova-GmbH/flowodm/issues
 - **Email**: andrey@aprova.ai
