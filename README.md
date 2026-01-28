@@ -58,7 +58,7 @@ class UserEvent(FlowBaseModel):
 ```python
 # Sync
 event = UserEvent(user_id="123", action="login", timestamp=datetime.now())
-event.produce_sync()
+event.produce()
 
 # Async
 await event.aproduce()

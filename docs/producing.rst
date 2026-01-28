@@ -8,7 +8,7 @@ Synchronous Production
 
 **Blocking Production**
 
-Use ``produce_sync()`` to produce a message and wait for broker acknowledgment:
+Use ``produce()`` to produce a message and wait for broker acknowledgment:
 
 .. code-block:: python
 
@@ -26,15 +26,15 @@ Use ``produce_sync()`` to produce a message and wait for broker acknowledgment:
        amount: float
 
    order = OrderEvent(order_id="ORD-001", amount=99.99)
-   order.produce_sync()  # Blocks until acknowledged
+   order.produce()  # Blocks until acknowledged
 
 **Non-Blocking Production**
 
-Use ``produce()`` for non-blocking production (fire-and-forget):
+Use ``produce_nowait()`` for non-blocking production (fire-and-forget):
 
 .. code-block:: python
 
-   order.produce()  # Returns immediately
+   order.produce_nowait()  # Returns immediately
 
    # Flush all pending messages
    from flowodm import get_producer
@@ -84,14 +84,14 @@ Messages can be produced with a key for partitioning:
 
    # order_id value is automatically used as the message key
    order = OrderEvent(order_id="ORD-001", amount=99.99)
-   order.produce_sync()
+   order.produce()
 
 **Explicit Key**
 
 .. code-block:: python
 
    order = OrderEvent(order_id="ORD-001", amount=99.99)
-   order.produce_sync(key="custom-key")
+   order.produce(key="custom-key")
 
 Delivery Callbacks
 ------------------
@@ -106,7 +106,7 @@ For non-blocking production, you can provide a callback:
        else:
            print(f"Message delivered to {msg.topic()}/{msg.partition()}")
 
-   order.produce(on_delivery=on_delivery)
+   order.produce_nowait(callback=on_delivery)
 
 Batch Production
 ----------------
@@ -156,7 +156,7 @@ Handle production errors appropriately:
    from flowodm.exceptions import ProducerError
 
    try:
-       order.produce_sync()
+       order.produce()
    except ProducerError as e:
        print(f"Failed to produce message: {e}")
        # Handle error: retry, log, alert, etc.

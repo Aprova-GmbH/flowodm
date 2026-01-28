@@ -69,7 +69,7 @@ uv run pytest -m unit --cov=flowodm --cov-report=term-missing
 uv run pytest tests/test_model.py -v
 
 # Run specific test
-uv run pytest tests/test_model.py::TestFlowBaseModel::test_produce_sync -v
+uv run pytest tests/test_model.py::TestProduceConsume::test_produce_sync_flushes -v
 
 # Format code
 uv run black src tests
@@ -320,7 +320,7 @@ order = OrderEvent(
     total=99.99,
     created_at=datetime.now()
 )
-order.produce_sync()
+order.produce()
 
 # Consume
 for order in OrderEvent.consume_iter(max_messages=10):
@@ -383,11 +383,9 @@ class MyEvent(FlowBaseModel):
         key_field = "event_id"
 ```
 
-**Method Pairs (Sync/Async)**
-- `produce()` / `aproduce()`
-- `produce_sync()` / `aproduce()`
-- `consume_one()` / `aconsume_one()`
-- `consume_iter()` / `aconsume_iter()`
+**Core Methods**
+- Produce: `produce()` (blocking), `produce_nowait()` (non-blocking), `aproduce()` (async)
+- Consume: `consume_one()` / `aconsume_one()`, `consume_iter()` / `aconsume_iter()`
 
 **Predefined Settings Profiles**
 - `LongRunningSettings` - ML inference, complex processing

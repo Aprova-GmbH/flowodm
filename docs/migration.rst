@@ -115,7 +115,7 @@ From confluent-kafka
 
    # Produce
    order = OrderEvent(order_id="123")
-   order.produce_sync()
+   order.produce()
 
    # Consume
    for event in OrderEvent.consume_iter():

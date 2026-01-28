@@ -74,10 +74,10 @@ Basic Setup
       )
 
       # Synchronous produce (blocks until confirmed)
-      order.produce_sync()
+      order.produce()
 
       # Non-blocking produce
-      order.produce()
+      order.produce_nowait()
 
 4. **Consume Messages**
 

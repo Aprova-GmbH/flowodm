@@ -91,7 +91,7 @@ event = UserEvent(
     action="login",
     timestamp=datetime.now()
 )
-event.produce_sync()
+event.produce()
 print(f"Produced event with ID: {event.message_id}")
 
 # Consume messages
@@ -328,7 +328,7 @@ class OrderEvent(FlowBaseModel):
     total: float
 
 # Messages with same customer_id go to same partition
-order.produce_sync()
+order.produce()
 ```
 
 ### Non-Blocking Production

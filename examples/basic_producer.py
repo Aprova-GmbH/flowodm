@@ -49,7 +49,7 @@ def main_sync():
     )
 
     # Produce single message (non-blocking)
-    order.produce()
+    order.produce_nowait()
     print(f"Produced order {order.order_id} (non-blocking)")
 
     # Produce with confirmation (blocking)
@@ -61,7 +61,7 @@ def main_sync():
         total_price=99.99,
         created_at=datetime.now(),
     )
-    order2.produce_sync()
+    order2.produce()
     print(f"Produced order {order2.order_id} (with confirmation)")
 
     # Batch produce

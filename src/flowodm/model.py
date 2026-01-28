@@ -320,9 +320,9 @@ class FlowBaseModel(BaseModel):
 
     # ==================== Produce Operations (Sync) ====================
 
-    def produce(self, callback: Any | None = None) -> None:
+    def produce_nowait(self, callback: Any | None = None) -> None:
         """
-        Produce message to Kafka (non-blocking).
+        Produce message to Kafka (non-blocking, fire-and-forget).
 
         Args:
             callback: Optional delivery callback function(err, msg)
@@ -343,9 +343,9 @@ class FlowBaseModel(BaseModel):
         except Exception as e:
             raise ProducerError(f"Failed to produce message: {e}") from e
 
-    def produce_sync(self, timeout: float = 10.0) -> None:
+    def produce(self, timeout: float = 10.0) -> None:
         """
-        Produce message and wait for delivery confirmation.
+        Produce message and wait for delivery confirmation (blocking).
 
         Args:
             timeout: Maximum time to wait for delivery (seconds)
@@ -357,7 +357,7 @@ class FlowBaseModel(BaseModel):
             if err:
                 delivery_error = ProducerError(f"Delivery failed: {err}")
 
-        self.produce(callback=on_delivery)
+        self.produce_nowait(callback=on_delivery)
 
         producer = self.get_producer()
         remaining = producer.flush(timeout=timeout)
@@ -384,7 +384,7 @@ class FlowBaseModel(BaseModel):
         count = 0
 
         for msg in messages:
-            msg.produce()
+            msg.produce_nowait()
             count += 1
 
         if flush and producer:

@@ -26,7 +26,7 @@ Example:
     >>>
     >>> # Produce messages
     >>> event = UserEvent(user_id="123", action="login", timestamp=datetime.now())
-    >>> event.produce_sync()
+    >>> event.produce()
     >>>
     >>> # Consume messages
     >>> for event in UserEvent.consume_iter():

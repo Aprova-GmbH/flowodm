@@ -220,21 +220,21 @@ class TestProduceConsume:
     """Tests for produce/consume operations with mocks."""
 
     def test_produce_calls_producer(self, mock_producer):
-        """Test that produce() calls the producer correctly."""
+        """Test that produce_nowait() calls the producer correctly."""
         event = MinimalModel(name="test")
 
         with patch.object(MinimalModel, "get_producer", return_value=mock_producer):
-            event.produce()
+            event.produce_nowait()
 
         assert len(mock_producer.messages) == 1
         assert mock_producer.messages[0]["topic"] == "minimal-topic"
 
     def test_produce_sync_flushes(self, mock_producer):
-        """Test that produce_sync() flushes the producer."""
+        """Test that produce() flushes the producer."""
         event = MinimalModel(name="test")
 
         with patch.object(MinimalModel, "get_producer", return_value=mock_producer):
-            event.produce_sync()
+            event.produce()
 
         assert mock_producer._flushed is True
 
