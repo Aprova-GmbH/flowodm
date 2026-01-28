@@ -51,8 +51,11 @@ export KAFKA_SASL_MECHANISM="PLAIN"
 export KAFKA_SASL_USERNAME="YOUR_API_KEY"
 export KAFKA_SASL_PASSWORD="YOUR_API_SECRET"
 export SCHEMA_REGISTRY_URL="https://psrc-xxx.us-east-2.aws.confluent.cloud"
-export SCHEMA_REGISTRY_API_KEY="SR_API_KEY"
-export SCHEMA_REGISTRY_API_SECRET="SR_API_SECRET"
+# Option 1: Combined format (recommended)
+export SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO="SR_API_KEY:SR_API_SECRET"
+# Option 2: Separate key/secret
+# export SCHEMA_REGISTRY_API_KEY="SR_API_KEY"
+# export SCHEMA_REGISTRY_API_SECRET="SR_API_SECRET"
 ```
 
 ### 2. Define Your First Model

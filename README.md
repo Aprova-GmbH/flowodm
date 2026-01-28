@@ -192,8 +192,9 @@ KAFKA_SASL_PASSWORD=your-api-secret
 
 # Schema Registry
 SCHEMA_REGISTRY_URL=https://your-registry.confluent.cloud
-SCHEMA_REGISTRY_API_KEY=your-sr-api-key
-SCHEMA_REGISTRY_API_SECRET=your-sr-api-secret
+SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO=your-sr-api-key:your-sr-api-secret  # Or use separate key/secret:
+# SCHEMA_REGISTRY_API_KEY=your-sr-api-key
+# SCHEMA_REGISTRY_API_SECRET=your-sr-api-secret
 ```
 
 Or programmatically:
@@ -208,8 +209,11 @@ connect(
     sasl_username="api-key",
     sasl_password="api-secret",
     schema_registry_url="https://registry.confluent.cloud",
-    schema_registry_api_key="sr-key",
-    schema_registry_api_secret="sr-secret",
+    # Option 1: Combined format
+    schema_registry_basic_auth_user_info="sr-key:sr-secret",
+    # Option 2: Separate key/secret
+    # schema_registry_api_key="sr-key",
+    # schema_registry_api_secret="sr-secret",
 )
 ```
 

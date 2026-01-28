@@ -32,6 +32,7 @@ class KafkaConnection:
         - KAFKA_SASL_USERNAME: SASL username
         - KAFKA_SASL_PASSWORD: SASL password
         - SCHEMA_REGISTRY_URL: Schema Registry URL
+        - SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO: Basic auth in format "key:secret" (alternative to separate key/secret)
         - SCHEMA_REGISTRY_API_KEY: Confluent Cloud API key
         - SCHEMA_REGISTRY_API_SECRET: Confluent Cloud API secret
 
@@ -53,6 +54,7 @@ class KafkaConnection:
     _schema_registry_url: str | None = None
     _schema_registry_api_key: str | None = None
     _schema_registry_api_secret: str | None = None
+    _schema_registry_basic_auth_user_info: str | None = None
 
     # Sync clients
     _producer: Producer | None = None
@@ -91,6 +93,7 @@ class KafkaConnection:
         self._schema_registry_url = os.environ.get("SCHEMA_REGISTRY_URL")
         self._schema_registry_api_key = os.environ.get("SCHEMA_REGISTRY_API_KEY")
         self._schema_registry_api_secret = os.environ.get("SCHEMA_REGISTRY_API_SECRET")
+        self._schema_registry_basic_auth_user_info = os.environ.get("SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO")
 
     def configure(
         self,
@@ -102,6 +105,7 @@ class KafkaConnection:
         schema_registry_url: str | None = None,
         schema_registry_api_key: str | None = None,
         schema_registry_api_secret: str | None = None,
+        schema_registry_basic_auth_user_info: str | None = None,
     ) -> None:
         """
         Configure the connection with explicit parameters.
@@ -124,6 +128,8 @@ class KafkaConnection:
             self._schema_registry_api_key = schema_registry_api_key
         if schema_registry_api_secret:
             self._schema_registry_api_secret = schema_registry_api_secret
+        if schema_registry_basic_auth_user_info:
+            self._schema_registry_basic_auth_user_info = schema_registry_basic_auth_user_info
 
         # Register cleanup handler
         atexit.register(self.close_connection)
@@ -234,7 +240,11 @@ class KafkaConnection:
             config: dict[str, Any] = {"url": self._schema_registry_url}
 
             # Add authentication if provided
-            if self._schema_registry_api_key and self._schema_registry_api_secret:
+            if self._schema_registry_basic_auth_user_info:
+                # Use combined format directly (highest priority)
+                config["basic.auth.user.info"] = self._schema_registry_basic_auth_user_info
+            elif self._schema_registry_api_key and self._schema_registry_api_secret:
+                # Fall back to separate key/secret format
                 config["basic.auth.user.info"] = (
                     f"{self._schema_registry_api_key}:{self._schema_registry_api_secret}"
                 )
@@ -363,6 +373,7 @@ def connect(
     schema_registry_url: str | None = None,
     schema_registry_api_key: str | None = None,
     schema_registry_api_secret: str | None = None,
+    schema_registry_basic_auth_user_info: str | None = None,
 ) -> KafkaConnection:
     """
     Configure and return the global Kafka connection.
@@ -376,6 +387,7 @@ def connect(
         schema_registry_url: Schema Registry URL
         schema_registry_api_key: Schema Registry API key (Confluent Cloud)
         schema_registry_api_secret: Schema Registry API secret (Confluent Cloud)
+        schema_registry_basic_auth_user_info: Schema Registry basic auth (format: "key:secret")
 
     Returns:
         Configured KafkaConnection instance
@@ -396,6 +408,7 @@ def connect(
         schema_registry_url=schema_registry_url,
         schema_registry_api_key=schema_registry_api_key,
         schema_registry_api_secret=schema_registry_api_secret,
+        schema_registry_basic_auth_user_info=schema_registry_basic_auth_user_info,
     )
     return conn
 

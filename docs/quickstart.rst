@@ -115,6 +115,8 @@ FlowODM can be configured via environment variables:
      - SASL password
    * - ``SCHEMA_REGISTRY_URL``
      - Schema Registry URL
+   * - ``SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO``
+     - Basic auth in format ``key:secret`` (alternative to separate key/secret)
    * - ``SCHEMA_REGISTRY_API_KEY``
      - Schema Registry API key (for Confluent Cloud)
    * - ``SCHEMA_REGISTRY_API_SECRET``
