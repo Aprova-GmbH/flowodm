@@ -93,7 +93,9 @@ class KafkaConnection:
         self._schema_registry_url = os.environ.get("SCHEMA_REGISTRY_URL")
         self._schema_registry_api_key = os.environ.get("SCHEMA_REGISTRY_API_KEY")
         self._schema_registry_api_secret = os.environ.get("SCHEMA_REGISTRY_API_SECRET")
-        self._schema_registry_basic_auth_user_info = os.environ.get("SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO")
+        self._schema_registry_basic_auth_user_info = os.environ.get(
+            "SCHEMA_REGISTRY_BASIC_AUTH_USER_INFO"
+        )
 
     def configure(
         self,
