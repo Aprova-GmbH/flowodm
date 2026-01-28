@@ -69,23 +69,24 @@ class FlowBaseModel(BaseModel):
         """
         Settings for the Kafka model.
 
-        Attributes:
-            topic: Kafka topic name (required)
-            schema_subject: Schema Registry subject (defaults to {topic}-value)
-            schema_path: Path to local .avsc file (optional)
-            consumer_group: Consumer group ID (optional)
-            key_field: Field name to use as message key (optional)
-            key_serializer: Key serialization format: "string", "avro", "json"
-            value_serializer: Value serialization format: "avro", "json"
+        Configuration class for defining Kafka topic, schema, and consumer settings.
+        The type annotations provide the documentation for each setting.
         """
 
         topic: str | None = None
+        """Kafka topic name (required)"""
         schema_subject: str | None = None
+        """Schema Registry subject (defaults to {topic}-value)"""
         schema_path: str | None = None
+        """Path to local .avsc file (optional)"""
         consumer_group: str | None = None
+        """Consumer group ID (optional)"""
         key_field: str | None = None
+        """Field name to use as message key (optional)"""
         key_serializer: str = "string"
+        """Key serialization format: "string", "avro", "json" """
         value_serializer: str = "avro"
+        """Value serialization format: "avro", "json" """
 
     # ==================== Class Methods for Configuration ====================
 
