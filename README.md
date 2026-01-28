@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="docs/logo-web.png" alt="FlowODM Logo" width="500">
+</div>
+
 # FlowODM
 
 [![PyPI version](https://badge.fury.io/py/flowodm.svg)](https://badge.fury.io/py/flowodm)

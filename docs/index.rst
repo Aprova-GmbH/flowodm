@@ -1,3 +1,8 @@
+.. image:: logo-web.png
+   :align: center
+   :width: 500px
+   :alt: FlowODM Logo
+
 FlowODM Documentation
 =====================
 
