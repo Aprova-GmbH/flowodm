@@ -1,0 +1,22 @@
+# Include important documentation files
+include README.md
+include LICENSE
+include CHANGELOG.md
+include PUBLISHING.md
+include QUICK_REFERENCE.md
+include QUICKSTART.md
+
+# Include package marker
+include src/flowodm/py.typed
+
+# Exclude build artifacts and caches
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude .DS_Store
+global-exclude *.so
+global-exclude *.dylib
+
+# Exclude tests and docs from distribution
+prune tests
+prune docs
+prune examples
