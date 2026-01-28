@@ -1,7 +1,7 @@
 """Unit tests for FlowBaseModel."""
 
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -247,3 +247,369 @@ class TestProduceConsume:
 
         assert count == 5
         assert len(mock_producer.messages) == 5
+
+    def test_produce_many_no_flush(self, mock_producer):
+        """Test batch producing without flush."""
+        events = [MinimalModel(name=f"test-{i}") for i in range(3)]
+
+        with patch.object(MinimalModel, "get_producer", return_value=mock_producer):
+            count = MinimalModel.produce_many(events, flush=False)
+
+        assert count == 3
+        assert len(mock_producer.messages) == 3
+        # flush() should not be called when flush=False
+        # (We can't easily check this with the mock, but count is correct)
+
+    def test_produce_many_empty_list(self, mock_producer):
+        """Test batch producing with empty list."""
+        with patch.object(MinimalModel, "get_producer", return_value=mock_producer):
+            count = MinimalModel.produce_many([])
+
+        assert count == 0
+        assert len(mock_producer.messages) == 0
+
+    def test_produce_with_callback(self, mock_producer):
+        """Test produce_nowait with callback."""
+        event = MinimalModel(name="test")
+        callback_called = []
+
+        def callback(err, msg):
+            callback_called.append((err, msg))
+
+        with patch.object(MinimalModel, "get_producer", return_value=mock_producer):
+            event.produce_nowait(callback=callback)
+
+        assert len(mock_producer.messages) == 1
+
+    def test_consume_one_with_message(self, mock_consumer_with_message):
+        """Test consume_one returns a message."""
+        with patch.object(
+            MinimalModel,
+            "get_consumer",
+            return_value=mock_consumer_with_message,
+        ):
+            result = MinimalModel.consume_one(group_id="test-group")
+
+        assert result is not None
+        assert isinstance(result, MinimalModel)
+        assert result.name == "test"
+
+    def test_consume_one_no_message(self, mock_consumer_no_message):
+        """Test consume_one returns None when no message."""
+        with patch.object(
+            MinimalModel,
+            "get_consumer",
+            return_value=mock_consumer_no_message,
+        ):
+            result = MinimalModel.consume_one(group_id="test-group")
+
+        assert result is None
+
+    def test_consume_batch(self, mock_consumer_with_batch):
+        """Test consume_batch returns multiple messages."""
+        with patch.object(
+            MinimalModel,
+            "get_consumer",
+            return_value=mock_consumer_with_batch,
+        ):
+            results = MinimalModel.consume_batch(max_messages=3, group_id="test-group")
+
+        assert len(results) == 3
+        assert all(isinstance(r, MinimalModel) for r in results)
+
+    @pytest.mark.asyncio
+    async def test_aproduce(self, mock_async_producer):
+        """Test async produce operation."""
+        event = MinimalModel(name="test")
+
+        with patch.object(
+            MinimalModel,
+            "get_async_producer",
+            return_value=mock_async_producer,
+        ):
+            await event.aproduce()
+
+        assert len(mock_async_producer.messages) == 1
+
+    @pytest.mark.asyncio
+    async def test_aproduce_many(self, mock_async_producer):
+        """Test async batch produce."""
+        events = [MinimalModel(name=f"test-{i}") for i in range(3)]
+
+        with patch.object(
+            MinimalModel,
+            "get_async_producer",
+            return_value=mock_async_producer,
+        ):
+            count = await MinimalModel.aproduce_many(events)
+
+        assert count == 3
+        assert len(mock_async_producer.messages) == 3
+
+    @pytest.mark.asyncio
+    async def test_aconsume_one(self, mock_async_consumer_with_message):
+        """Test async consume_one."""
+        with patch.object(
+            MinimalModel,
+            "get_async_consumer",
+            return_value=mock_async_consumer_with_message,
+        ):
+            result = await MinimalModel.aconsume_one(group_id="test-group")
+
+        assert result is not None
+        assert isinstance(result, MinimalModel)
+        assert result.name == "test"
+
+
+@pytest.mark.unit
+class TestSerializationErrors:
+    """Tests for serialization error handling."""
+
+    def test_serialize_avro(self):
+        """Test Avro serialization."""
+        event = MinimalModel(name="test")
+        data = event._serialize_avro()
+
+        assert isinstance(data, bytes)
+        assert len(data) > 0
+
+    def test_deserialize_avro(self):
+        """Test Avro deserialization."""
+        event = MinimalModel(name="test")
+        data = event._serialize_avro()
+
+        result = MinimalModel._deserialize_avro(data)
+
+        assert result.name == "test"
+        assert result.message_id == event.message_id
+
+    def test_get_avro_schema_from_path(self, tmp_path):
+        """Test loading schema from file path."""
+        import json
+
+        schema_file = tmp_path / "test_schema.avsc"
+        schema = {
+            "type": "record",
+            "name": "TestModel",
+            "fields": [
+                {"name": "name", "type": "string"},
+                {"name": "message_id", "type": "string"},
+            ],
+        }
+
+        with open(schema_file, "w") as f:
+            json.dump(schema, f)
+
+        # Store path as string for use in class definition
+        path_str = str(schema_file)
+
+        class TestModel(FlowBaseModel):
+            class Settings:
+                topic = "test"
+                schema_path = path_str
+
+            name: str
+
+        result_schema = TestModel._get_avro_schema()
+        assert result_schema["name"] == "TestModel"
+
+
+@pytest.mark.unit
+class TestConsumerGroup:
+    """Tests for consumer group handling."""
+
+    def test_get_consumer_with_group_id(self, mock_consumer_no_message):
+        """Test getting consumer with explicit group_id."""
+        with patch("flowodm.model.get_consumer", return_value=mock_consumer_no_message):
+            consumer = UserEvent.get_consumer(group_id="custom-group")
+
+        assert consumer is not None
+
+    def test_get_consumer_with_settings_group(self, mock_consumer_no_message):
+        """Test getting consumer with Settings.consumer_group."""
+        with patch("flowodm.model.get_consumer", return_value=mock_consumer_no_message):
+            consumer = UserEvent.get_consumer()
+
+        assert consumer is not None
+
+    def test_get_consumer_no_group_raises_error(self):
+        """Test getting consumer without group_id raises SettingsError."""
+        with pytest.raises(SettingsError):
+            MinimalModel.get_consumer()  # MinimalModel has no consumer_group
+
+    @pytest.mark.asyncio
+    async def test_get_async_consumer_no_group_raises_error(self):
+        """Test getting async consumer without group_id raises SettingsError."""
+        with pytest.raises(SettingsError):
+            await MinimalModel.get_async_consumer()
+
+
+@pytest.mark.unit
+class TestPythonTypeToAvro:
+    """Tests for Python type to Avro type conversion."""
+
+    def test_basic_types(self):
+        """Test basic Python type conversion."""
+        assert MinimalModel._python_type_to_avro(str) == "string"
+        assert MinimalModel._python_type_to_avro(int) == "long"
+        assert MinimalModel._python_type_to_avro(float) == "double"
+        assert MinimalModel._python_type_to_avro(bool) == "boolean"
+        assert MinimalModel._python_type_to_avro(bytes) == "bytes"
+
+    def test_none_type(self):
+        """Test None type conversion."""
+        assert MinimalModel._python_type_to_avro(type(None)) == "null"
+
+    def test_datetime_type(self):
+        """Test datetime conversion to timestamp-millis."""
+        result = MinimalModel._python_type_to_avro(datetime)
+        assert isinstance(result, dict)
+        assert result["type"] == "long"
+        assert result["logicalType"] == "timestamp-millis"
+
+    def test_unknown_type_fallback(self):
+        """Test unknown type falls back to string."""
+
+        class CustomType:
+            pass
+
+        result = MinimalModel._python_type_to_avro(CustomType)
+        assert result == "string"
+
+
+@pytest.mark.unit
+class TestGetSchemaPath:
+    """Tests for schema path retrieval."""
+
+    def test_get_schema_path_when_set(self):
+        """Test getting schema path when set in Settings."""
+
+        class ModelWithSchemaPath(FlowBaseModel):
+            class Settings:
+                topic = "test"
+                schema_path = "/path/to/schema.avsc"
+
+            name: str
+
+        assert ModelWithSchemaPath._get_schema_path() == "/path/to/schema.avsc"
+
+    def test_get_schema_path_when_not_set(self):
+        """Test getting schema path returns None when not set."""
+        assert MinimalModel._get_schema_path() is None
+
+
+@pytest.mark.unit
+class TestErrorHandling:
+    """Tests for error handling in model operations."""
+
+    def test_serialize_avro_error_handling(self):
+        """Test error handling in serialization."""
+        import fastavro
+
+        from flowodm.exceptions import SerializationError
+
+        event = UserEvent(
+            user_id="test",
+            action="test",
+            timestamp=datetime.now(),
+        )
+
+        # Mock fastavro.schemaless_writer to raise error
+        with patch.object(
+            fastavro, "schemaless_writer", side_effect=Exception("Serialization error")
+        ):
+            with pytest.raises(SerializationError):
+                event._serialize_avro()
+
+    def test_deserialize_avro_error_handling(self):
+        """Test error handling in deserialization."""
+        from flowodm.exceptions import DeserializationError
+
+        # Invalid bytes that can't be deserialized
+        with pytest.raises(DeserializationError):
+            MinimalModel._deserialize_avro(b"invalid data")
+
+    def test_get_message_key_none_value(self):
+        """Test getting message key when key field value is None."""
+
+        class ModelWithOptionalKey(FlowBaseModel):
+            class Settings:
+                topic = "test"
+                key_field = "optional_key"
+
+            optional_key: str | None = None
+
+        model = ModelWithOptionalKey()
+        assert model._get_message_key() is None
+
+    def test_produce_error_handling(self, mock_producer):
+        """Test error handling in produce operation."""
+        from flowodm.exceptions import ProducerError
+
+        mock_producer.produce = lambda *args, **kwargs: (_ for _ in ()).throw(
+            Exception("Producer error")
+        )
+
+        event = MinimalModel(name="test")
+
+        with patch.object(MinimalModel, "get_producer", return_value=mock_producer):
+            with pytest.raises(ProducerError):
+                event.produce_nowait()
+
+    def test_produce_with_delivery_error(self, mock_producer):
+        """Test produce with delivery callback error."""
+        from flowodm.exceptions import ProducerError
+
+        event = MinimalModel(name="test")
+
+        # Create a producer that simulates delivery failure
+        error_producer = MagicMock()
+        error_producer.produce = lambda topic, value, key, callback, **kwargs: callback(
+            Exception("Delivery failed"), None
+        )
+        error_producer.flush = lambda timeout: 0
+
+        with patch.object(MinimalModel, "get_producer", return_value=error_producer):
+            with pytest.raises(ProducerError, match="Delivery failed"):
+                event.produce()
+
+    def test_produce_timeout(self, mock_producer):
+        """Test produce timeout."""
+        from flowodm.exceptions import ProducerError
+
+        event = MinimalModel(name="test")
+
+        # Simulate flush returning remaining messages (timeout)
+        mock_producer.flush = lambda timeout: 5  # 5 messages remaining
+
+        with patch.object(MinimalModel, "get_producer", return_value=mock_producer):
+            with pytest.raises(ProducerError, match="Timed out"):
+                event.produce()
+
+
+@pytest.mark.unit
+class TestConsumeIterator:
+    """Tests for consume iterator functionality."""
+
+    def test_consume_iter_with_no_messages(self, mock_consumer_no_message):
+        """Test consume_iter with no messages available."""
+        # This test verifies that consume_iter handles empty queues gracefully
+        # In practice, it would loop forever, but we just verify setup works
+        with patch.object(MinimalModel, "get_consumer", return_value=mock_consumer_no_message):
+            # Just verify we can start iterating (don't actually consume since it would loop forever)
+            iterator = MinimalModel.consume_iter(group_id="test-group")
+            assert iterator is not None
+
+
+@pytest.mark.unit
+class TestGetAvroSchemaFallbacks:
+    """Tests for _get_avro_schema fallback mechanisms."""
+
+    def test_get_avro_schema_auto_generate_fallback(self):
+        """Test that _get_avro_schema falls back to auto-generation."""
+        # MinimalModel has no schema_path and no registry, so it should auto-generate
+        schema = MinimalModel._get_avro_schema()
+
+        assert schema["type"] == "record"
+        assert schema["name"] == "MinimalModel"
+        assert "fields" in schema

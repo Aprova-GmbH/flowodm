@@ -194,3 +194,233 @@ class TestTypeCompatibility:
         assert _types_compatible(int, "long") is True
         assert _types_compatible(float, "float") is True
         assert _types_compatible(float, "double") is True
+
+
+@pytest.mark.unit
+class TestAvroTypeToPythonAdvanced:
+    """Advanced tests for Avro type to Python type conversion."""
+
+    def test_union_with_multiple_non_null_types(self):
+        """Test union with multiple non-null types returns Any."""
+        from typing import Any
+
+        result = _avro_type_to_python(["string", "int"])
+        assert result == Any
+
+    def test_union_with_only_null(self):
+        """Test union with only null returns None type."""
+        result = _avro_type_to_python(["null"])
+        assert result is type(None)
+
+    def test_logical_type_date(self):
+        """Test date logical type conversion."""
+        from datetime import date
+
+        avro_type = {"type": "int", "logicalType": "date"}
+        result = _avro_type_to_python(avro_type)
+        assert result == date
+
+    def test_logical_type_decimal(self):
+        """Test decimal logical type conversion."""
+        from decimal import Decimal
+
+        avro_type = {"type": "bytes", "logicalType": "decimal", "precision": 10, "scale": 2}
+        result = _avro_type_to_python(avro_type)
+        assert result == Decimal
+
+    def test_logical_type_uuid(self):
+        """Test UUID logical type conversion."""
+        avro_type = {"type": "string", "logicalType": "uuid"}
+        result = _avro_type_to_python(avro_type)
+        assert result is str
+
+    def test_complex_type_without_logical_type(self):
+        """Test complex type with base type but no logical type."""
+        avro_type = {"type": "string"}
+        result = _avro_type_to_python(avro_type)
+        assert result is str
+
+    def test_unknown_complex_type(self):
+        """Test unknown complex type returns Any."""
+        from typing import Any
+
+        avro_type = {"unknown": "value"}
+        result = _avro_type_to_python(avro_type)
+        assert result == Any
+
+
+@pytest.mark.unit
+class TestGenerateModelFromSchema:
+    """Tests for model generation from schema."""
+
+    def test_generate_from_schema_dict(self):
+        """Test generating model from schema dictionary."""
+        from flowodm.schema import generate_model_from_schema
+
+        schema = {
+            "type": "record",
+            "name": "TestEvent",
+            "fields": [
+                {"name": "event_id", "type": "string"},
+                {"name": "count", "type": "int"},
+            ],
+        }
+
+        Model = generate_model_from_schema(schema, topic="test-topic")
+
+        assert Model.__name__ == "TestEvent"
+        assert Model._get_topic() == "test-topic"
+        # Create instance to verify fields
+        instance = Model(event_id="123", count=42, message_id="test-id")
+        assert instance.event_id == "123"
+        assert instance.count == 42
+
+    def test_generate_from_schema_with_optional_field(self):
+        """Test generating model with optional field (has default)."""
+        from flowodm.schema import generate_model_from_schema
+
+        schema = {
+            "type": "record",
+            "name": "TestEvent",
+            "fields": [
+                {"name": "event_id", "type": "string"},
+                {"name": "optional_field", "type": ["null", "string"], "default": None},
+            ],
+        }
+
+        Model = generate_model_from_schema(schema, topic="test-topic")
+        instance = Model(event_id="123", message_id="test-id")
+        assert instance.optional_field is None
+
+    def test_generate_from_schema_file(self, tmp_path):
+        """Test generating model from schema file."""
+        from flowodm.schema import generate_model_from_schema
+
+        schema_file = tmp_path / "test.avsc"
+        schema = {
+            "type": "record",
+            "name": "FileEvent",
+            "fields": [
+                {"name": "name", "type": "string"},
+            ],
+        }
+
+        with open(schema_file, "w") as f:
+            json.dump(schema, f)
+
+        Model = generate_model_from_schema(str(schema_file), topic="test-topic")
+        assert Model.__name__ == "FileEvent"
+
+    def test_generate_with_custom_class_name(self):
+        """Test generating model with custom class name."""
+        from flowodm.schema import generate_model_from_schema
+
+        schema = {
+            "type": "record",
+            "name": "OriginalName",
+            "fields": [{"name": "field1", "type": "string"}],
+        }
+
+        Model = generate_model_from_schema(
+            schema,
+            topic="test-topic",
+            class_name="CustomName",
+        )
+        assert Model.__name__ == "CustomName"
+
+    def test_generate_with_consumer_group(self):
+        """Test generating model with consumer group."""
+        from flowodm.schema import generate_model_from_schema
+
+        schema = {
+            "type": "record",
+            "name": "TestEvent",
+            "fields": [{"name": "field1", "type": "string"}],
+        }
+
+        Model = generate_model_from_schema(
+            schema,
+            topic="test-topic",
+            consumer_group="test-group",
+        )
+        assert Model._get_consumer_group() == "test-group"
+
+
+@pytest.mark.unit
+class TestValidationResult:
+    """Tests for ValidationResult class."""
+
+    def test_validation_result_str_valid(self):
+        """Test ValidationResult string representation when valid."""
+        result = ValidationResult(is_valid=True, errors=[], warnings=[])
+        result_str = str(result)
+        assert "valid" in result_str.lower()
+
+    def test_validation_result_str_invalid(self):
+        """Test ValidationResult string representation when invalid."""
+        result = ValidationResult(
+            is_valid=False,
+            errors=["Error 1", "Error 2"],
+            warnings=["Warning 1"],
+        )
+        result_str = str(result)
+        assert "Error 1" in result_str
+        assert "Error 2" in result_str
+
+
+@pytest.mark.unit
+class TestIsNullableAvroType:
+    """Tests for _is_nullable_avro_type helper."""
+
+    def test_nullable_union_type(self):
+        """Test detecting nullable union type."""
+        from flowodm.schema import _is_nullable_avro_type
+
+        assert _is_nullable_avro_type(["null", "string"]) is True
+
+    def test_non_nullable_union_type(self):
+        """Test detecting non-nullable union type."""
+        from flowodm.schema import _is_nullable_avro_type
+
+        assert _is_nullable_avro_type(["string", "int"]) is False
+
+    def test_simple_type_not_nullable(self):
+        """Test simple type is not nullable."""
+        from flowodm.schema import _is_nullable_avro_type
+
+        assert _is_nullable_avro_type("string") is False
+
+    def test_null_type_is_nullable(self):
+        """Test null type is nullable."""
+        from flowodm.schema import _is_nullable_avro_type
+
+        assert _is_nullable_avro_type("null") is True
+
+
+@pytest.mark.unit
+class TestValidationErrors:
+    """Tests for validation error cases."""
+
+    def test_validation_type_mismatch_in_common_fields(self):
+        """Test validation detects type mismatches in common fields."""
+
+        class WrongTypeModel(FlowBaseModel):
+            class Settings:
+                topic = "test"
+
+            user_id: int  # Should be string
+
+        schema = {
+            "type": "record",
+            "name": "WrongTypeModel",
+            "fields": [
+                {"name": "user_id", "type": "string"},  # Expects string
+                {"name": "message_id", "type": "string"},
+            ],
+        }
+
+        result = _validate_model_against_schema(WrongTypeModel, schema)
+
+        # Should have error for type mismatch
+        assert result.is_valid is False
+        assert any("user_id" in error and "type mismatch" in error for error in result.errors)
