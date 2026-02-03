@@ -105,7 +105,7 @@ class TestAsyncConsumerLoopWindowsCompatibility:
         mock_model = MagicMock()
         mock_model._get_topic.return_value = "test-topic"
 
-        async def mock_handler(event):
+        async def mock_handler(_event):
             pass
 
         # Create a mock consumer that returns None (no messages)
@@ -155,7 +155,7 @@ class TestAsyncConsumerLoopWindowsCompatibility:
         mock_model = MagicMock()
         mock_model._get_topic.return_value = "test-topic"
 
-        async def mock_handler(event):
+        async def mock_handler(_event):
             pass
 
         # Create a mock consumer that returns None (no messages)
@@ -202,7 +202,7 @@ class TestAsyncConsumerLoopWindowsCompatibility:
         """Test that the Windows signal fallback correctly calls stop()."""
         mock_model = MagicMock()
 
-        async def mock_handler(event):
+        async def mock_handler(_event):
             pass
 
         loop = AsyncConsumerLoop(model=mock_model, handler=mock_handler)
