@@ -100,6 +100,7 @@ loop = ConsumerLoop(
     model=UserEvent,
     handler=process_event,
     settings=LongRunningSettings(),  # Tolerates long processing
+    commit_strategy="before_processing",  # Prevent duplicates in parallel pods
 )
 loop.run()  # Blocking, handles SIGTERM gracefully
 ```

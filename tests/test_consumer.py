@@ -32,7 +32,7 @@ class TestConsumerLoop:
         assert loop.max_retries == 3
         assert loop.retry_delay == 1.0
         assert loop.poll_timeout == 1.0
-        assert loop.commit_strategy == "per_message"
+        assert loop.commit_strategy == "before_processing"
 
     def test_consumer_loop_stop(self):
         """Test that stop() sets _running to False."""
@@ -150,7 +150,7 @@ class TestAsyncConsumerLoop:
         assert loop.max_retries == 3
         assert loop.retry_delay == 1.0
         assert loop.poll_timeout == 1.0
-        assert loop.commit_strategy == "per_message"
+        assert loop.commit_strategy == "before_processing"
 
     def test_async_consumer_loop_stop(self):
         """Test that stop() sets _running to False."""
@@ -280,3 +280,329 @@ class TestAsyncConsumerLoopWindowsCompatibility:
         fallback_handler(signal.SIGINT, None)
 
         assert loop._running is False
+
+
+@pytest.mark.unit
+class TestCommitStrategies:
+    """Unit tests for commit strategy functionality."""
+
+    def test_invalid_commit_strategy_raises_error(self):
+        """Test that invalid commit_strategy raises ValueError."""
+        mock_model = MagicMock()
+        mock_handler = MagicMock()
+
+        with pytest.raises(ValueError) as exc_info:
+            ConsumerLoop(model=mock_model, handler=mock_handler, commit_strategy="invalid_strategy")
+
+        assert "Invalid commit_strategy" in str(exc_info.value)
+        assert "invalid_strategy" in str(exc_info.value)
+
+    def test_before_processing_commits_early(self):
+        """Test that before_processing commits before handler execution."""
+        mock_model = MagicMock()
+        mock_model._deserialize_avro.return_value = {"test": "data"}
+
+        handler_called = False
+        commit_called_before_handler = None
+
+        def track_handler(_data):
+            nonlocal handler_called
+            handler_called = True
+
+        mock_consumer = MagicMock()
+
+        def track_commit(_msg):
+            nonlocal commit_called_before_handler
+            commit_called_before_handler = not handler_called
+
+        mock_consumer.commit.side_effect = track_commit
+
+        loop = ConsumerLoop(
+            model=mock_model, handler=track_handler, commit_strategy="before_processing"
+        )
+        loop._consumer = mock_consumer
+
+        # Create a mock message
+        mock_msg = MagicMock()
+        mock_msg.value.return_value = b"test_data"
+
+        # Process the message
+        loop._process_message(mock_msg)
+
+        # Verify commit was called before handler
+        assert commit_called_before_handler is True
+        assert handler_called is True
+        mock_consumer.commit.assert_called_once_with(mock_msg)
+
+    def test_after_processing_commits_late(self):
+        """Test that after_processing commits after handler execution."""
+        mock_model = MagicMock()
+        mock_model._deserialize_avro.return_value = {"test": "data"}
+
+        handler_called = False
+        commit_called_after_handler = None
+
+        def track_handler(_data):
+            nonlocal handler_called
+            handler_called = True
+
+        mock_consumer = MagicMock()
+
+        def track_commit(_msg):
+            nonlocal commit_called_after_handler
+            commit_called_after_handler = handler_called
+
+        mock_consumer.commit.side_effect = track_commit
+
+        loop = ConsumerLoop(
+            model=mock_model, handler=track_handler, commit_strategy="after_processing"
+        )
+        loop._consumer = mock_consumer
+
+        # Create a mock message
+        mock_msg = MagicMock()
+        mock_msg.value.return_value = b"test_data"
+
+        # Process the message
+        loop._process_message(mock_msg)
+
+        # Verify commit was called after handler
+        assert commit_called_after_handler is True
+        assert handler_called is True
+        mock_consumer.commit.assert_called_once_with(mock_msg)
+
+    def test_before_processing_skips_on_commit_failure(self):
+        """Test that message is skipped if early commit fails."""
+        mock_model = MagicMock()
+        mock_handler = MagicMock()
+        mock_consumer = MagicMock()
+
+        # Make commit fail on all attempts
+        mock_consumer.commit.side_effect = Exception("Commit failed")
+
+        loop = ConsumerLoop(
+            model=mock_model, handler=mock_handler, commit_strategy="before_processing"
+        )
+        loop._consumer = mock_consumer
+
+        # Create a mock message
+        mock_msg = MagicMock()
+        mock_msg.value.return_value = b"test_data"
+
+        with patch("flowodm.consumer.logger") as mock_logger:
+            # Process the message
+            loop._process_message(mock_msg)
+
+            # Verify handler was NOT called (message skipped)
+            mock_handler.assert_not_called()
+
+            # Verify error was logged
+            error_logs = [call_args[0][0] for call_args in mock_logger.error.call_args_list]
+            assert any("Skipping message" in log for log in error_logs)
+
+    def test_commit_retry_logic(self):
+        """Test that commit failures are retried with backoff."""
+        mock_model = MagicMock()
+        mock_handler = MagicMock()
+        mock_consumer = MagicMock()
+
+        # Make commit fail twice, then succeed
+        commit_attempt_count = 0
+
+        def commit_with_retries(_msg):
+            nonlocal commit_attempt_count
+            commit_attempt_count += 1
+            if commit_attempt_count < 3:
+                raise Exception("Transient failure")
+
+        mock_consumer.commit.side_effect = commit_with_retries
+
+        loop = ConsumerLoop(
+            model=mock_model, handler=mock_handler, commit_strategy="before_processing"
+        )
+        loop._consumer = mock_consumer
+
+        mock_msg = MagicMock()
+
+        with patch("time.sleep"):  # Speed up test by mocking sleep
+            result = loop._commit_offset(mock_msg, max_attempts=3)
+
+        # Verify commit was retried and eventually succeeded
+        assert result is True
+        assert commit_attempt_count == 3
+
+    def test_after_processing_commits_on_handler_failure(self):
+        """Test that after_processing commits even when handler fails after retries."""
+        mock_model = MagicMock()
+        mock_model._deserialize_avro.return_value = {"test": "data"}
+
+        def failing_handler(_data):
+            raise Exception("Handler failed")
+
+        mock_consumer = MagicMock()
+
+        loop = ConsumerLoop(
+            model=mock_model,
+            handler=failing_handler,
+            commit_strategy="after_processing",
+            max_retries=0,  # No retries for faster test
+        )
+        loop._consumer = mock_consumer
+
+        mock_msg = MagicMock()
+        mock_msg.value.return_value = b"test_data"
+
+        with patch("flowodm.consumer.logger"):
+            loop._process_message(mock_msg)
+
+        # Verify commit was called even though handler failed
+        mock_consumer.commit.assert_called_once_with(mock_msg)
+
+    def test_before_processing_does_not_commit_on_failure(self):
+        """Test that before_processing does not commit again on handler failure."""
+        mock_model = MagicMock()
+        mock_model._deserialize_avro.return_value = {"test": "data"}
+
+        def failing_handler(_data):
+            raise Exception("Handler failed")
+
+        mock_consumer = MagicMock()
+
+        loop = ConsumerLoop(
+            model=mock_model,
+            handler=failing_handler,
+            commit_strategy="before_processing",
+            max_retries=0,  # No retries for faster test
+        )
+        loop._consumer = mock_consumer
+
+        mock_msg = MagicMock()
+        mock_msg.value.return_value = b"test_data"
+
+        with patch("flowodm.consumer.logger"):
+            loop._process_message(mock_msg)
+
+        # Verify commit was called only once (early commit, not on failure)
+        mock_consumer.commit.assert_called_once_with(mock_msg)
+
+
+@pytest.mark.unit
+class TestAsyncCommitStrategies:
+    """Unit tests for async commit strategy functionality."""
+
+    def test_async_invalid_commit_strategy_raises_error(self):
+        """Test that invalid commit_strategy raises ValueError."""
+        mock_model = MagicMock()
+        mock_handler = MagicMock()
+
+        with pytest.raises(ValueError) as exc_info:
+            AsyncConsumerLoop(
+                model=mock_model, handler=mock_handler, commit_strategy="invalid_strategy"
+            )
+
+        assert "Invalid commit_strategy" in str(exc_info.value)
+
+    async def test_async_before_processing_commits_early(self):
+        """Test that before_processing commits before handler execution."""
+        mock_model = MagicMock()
+        mock_model._deserialize_avro.return_value = {"test": "data"}
+
+        handler_called = False
+        commit_called_before_handler = None
+
+        async def track_handler(_data):
+            nonlocal handler_called
+            handler_called = True
+
+        mock_consumer = MagicMock()
+
+        def track_commit(_msg):
+            nonlocal commit_called_before_handler
+            commit_called_before_handler = not handler_called
+
+        mock_consumer.commit.side_effect = track_commit
+
+        loop = AsyncConsumerLoop(
+            model=mock_model, handler=track_handler, commit_strategy="before_processing"
+        )
+        loop._consumer = mock_consumer
+
+        # Create a mock message
+        mock_msg = MagicMock()
+        mock_msg.value.return_value = b"test_data"
+
+        # Process the message
+        await loop._process_message(mock_msg)
+
+        # Verify commit was called before handler
+        assert commit_called_before_handler is True
+        assert handler_called is True
+        mock_consumer.commit.assert_called_once_with(mock_msg)
+
+    async def test_async_after_processing_commits_late(self):
+        """Test that after_processing commits after handler execution."""
+        mock_model = MagicMock()
+        mock_model._deserialize_avro.return_value = {"test": "data"}
+
+        handler_called = False
+        commit_called_after_handler = None
+
+        async def track_handler(_data):
+            nonlocal handler_called
+            handler_called = True
+
+        mock_consumer = MagicMock()
+
+        def track_commit(_msg):
+            nonlocal commit_called_after_handler
+            commit_called_after_handler = handler_called
+
+        mock_consumer.commit.side_effect = track_commit
+
+        loop = AsyncConsumerLoop(
+            model=mock_model, handler=track_handler, commit_strategy="after_processing"
+        )
+        loop._consumer = mock_consumer
+
+        # Create a mock message
+        mock_msg = MagicMock()
+        mock_msg.value.return_value = b"test_data"
+
+        # Process the message
+        await loop._process_message(mock_msg)
+
+        # Verify commit was called after handler
+        assert commit_called_after_handler is True
+        assert handler_called is True
+        mock_consumer.commit.assert_called_once_with(mock_msg)
+
+    async def test_async_commit_retry_logic(self):
+        """Test that async commit failures are retried with backoff."""
+        mock_model = MagicMock()
+        mock_handler = MagicMock()
+        mock_consumer = MagicMock()
+
+        # Make commit fail twice, then succeed
+        commit_attempt_count = 0
+
+        def commit_with_retries(_msg):
+            nonlocal commit_attempt_count
+            commit_attempt_count += 1
+            if commit_attempt_count < 3:
+                raise Exception("Transient failure")
+
+        mock_consumer.commit.side_effect = commit_with_retries
+
+        loop = AsyncConsumerLoop(
+            model=mock_model, handler=mock_handler, commit_strategy="before_processing"
+        )
+        loop._consumer = mock_consumer
+
+        mock_msg = MagicMock()
+
+        with patch("asyncio.sleep"):  # Speed up test by mocking sleep
+            result = await loop._commit_offset(mock_msg, max_attempts=3)
+
+        # Verify commit was retried and eventually succeeded
+        assert result is True
+        assert commit_attempt_count == 3

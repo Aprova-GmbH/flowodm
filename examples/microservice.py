@@ -110,6 +110,7 @@ def main():
         model=OrderEvent,
         handler=process_order,
         settings=LongRunningSettings(),  # Tolerates up to 10 min processing
+        commit_strategy="before_processing",  # Prevents duplicate processing in parallel pods
         error_handler=handle_error,
         on_startup=on_startup,
         on_shutdown=on_shutdown,
