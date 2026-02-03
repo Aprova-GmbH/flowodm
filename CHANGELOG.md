@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - Unreleased
+## [0.2.0] - 2026-02-03
 
 ### Added
 - New `commit_strategy="before_processing"` to prevent duplicate processing in parallel pod deployments
@@ -13,11 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Commit retry logic with exponential backoff for transient failures
 - Comprehensive documentation on commit strategies and delivery semantics in docs/consumer_loops.rst
 - Strategy validation that raises ValueError for invalid commit_strategy values
+- Windows compatibility for signal handlers in both `ConsumerLoop` and `AsyncConsumerLoop` ([#2](https://github.com/Aprova-GmbH/flowodm/pull/2))
+- Platform detection for SIGTERM availability (Unix-like vs Windows)
+- Fallback to `signal.signal()` for SIGINT on Windows when `add_signal_handler()` is not available
+- Comprehensive unit tests for Windows and Unix signal handling compatibility
 
 ### Changed
 - **BREAKING**: Removed `commit_strategy="per_message"` option (replaced by explicit `"before_processing"` and `"after_processing"`)
 - **BREAKING**: Default `commit_strategy` is now `"before_processing"` to prevent duplicates in parallel deployments
 - Updated examples and README to show recommended `before_processing` strategy for parallel deployments
+
+### Fixed
+- Signal handler setup now works correctly on Windows (uses only SIGINT when SIGTERM is unavailable)
+- AsyncConsumerLoop gracefully falls back to `signal.signal()` when asyncio signal handlers are not supported
 
 ### Migration Guide
 - **Default behavior changed**: New default is `commit_strategy="before_processing"` (prevents duplicates in parallel deployments)

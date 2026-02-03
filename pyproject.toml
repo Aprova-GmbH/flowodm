@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flowodm"
-version = "0.1.1"
+version = "0.2.0"
 description = "A lightweight ODM for Apache Kafka with Avro schema support"
 readme = "README.md"
 requires-python = ">=3.11"
