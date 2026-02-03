@@ -60,6 +60,79 @@ class TestConsumerLoop:
 
 
 @pytest.mark.unit
+class TestConsumerLoopWindowsCompatibility:
+    """Tests for Windows compatibility in ConsumerLoop."""
+
+    def test_consumer_loop_handles_missing_sigterm(self):
+        """Test that ConsumerLoop handles platforms without SIGTERM (Windows).
+
+        On Windows, signal.SIGTERM doesn't exist, so we should only set up
+        SIGINT handler.
+        """
+        mock_model = MagicMock()
+        mock_handler = MagicMock()
+
+        loop = ConsumerLoop(model=mock_model, handler=mock_handler)
+
+        # Track signal.signal calls
+        signal_calls = []
+        original_signal = signal.signal
+
+        def track_signal(signum, handler):
+            signal_calls.append((signum, handler))
+            return original_signal(signum, signal.SIG_DFL)
+
+        # Mock signal module to simulate Windows (no SIGTERM attribute)
+        with patch("signal.signal", side_effect=track_signal):
+            with patch("signal.SIGTERM", create=True) as mock_sigterm:
+                # Simulate Windows where SIGTERM doesn't exist
+                del mock_sigterm
+                # Make hasattr return False for SIGTERM
+                original_hasattr = hasattr
+
+                def custom_hasattr(obj, name):
+                    if obj.__name__ == "signal" and name == "SIGTERM":
+                        return False
+                    return original_hasattr(obj, name)
+
+                with patch("builtins.hasattr", side_effect=custom_hasattr):
+                    loop._setup_signal_handlers()
+
+        # Verify only SIGINT was set up
+        assert len(signal_calls) == 1
+        assert signal_calls[0][0] == signal.SIGINT
+
+    def test_consumer_loop_uses_both_signals_when_available(self):
+        """Test that ConsumerLoop uses both SIGTERM and SIGINT on Unix-like systems."""
+        mock_model = MagicMock()
+        mock_handler = MagicMock()
+
+        loop = ConsumerLoop(model=mock_model, handler=mock_handler)
+
+        # Track signal.signal calls
+        signal_calls = []
+        original_signal = signal.signal
+
+        def track_signal(signum, handler):
+            signal_calls.append((signum, handler))
+            return original_signal(signum, signal.SIG_DFL)
+
+        with patch("signal.signal", side_effect=track_signal):
+            loop._setup_signal_handlers()
+
+        # Verify both SIGINT and SIGTERM were set up (if SIGTERM exists)
+        if hasattr(signal, "SIGTERM"):
+            assert len(signal_calls) == 2
+            signal_nums = [call[0] for call in signal_calls]
+            assert signal.SIGINT in signal_nums
+            assert signal.SIGTERM in signal_nums
+        else:
+            # On Windows, only SIGINT
+            assert len(signal_calls) == 1
+            assert signal_calls[0][0] == signal.SIGINT
+
+
+@pytest.mark.unit
 class TestAsyncConsumerLoop:
     """Unit tests for asynchronous AsyncConsumerLoop."""
 

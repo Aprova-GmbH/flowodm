@@ -91,8 +91,12 @@ class ConsumerLoop:
 
     def _setup_signal_handlers(self) -> None:
         """Setup signal handlers for graceful shutdown."""
-        signal.signal(signal.SIGTERM, self._signal_handler)
+        # SIGINT (Ctrl+C) works on all platforms
         signal.signal(signal.SIGINT, self._signal_handler)
+
+        # SIGTERM only exists on Unix-like systems
+        if hasattr(signal, "SIGTERM"):
+            signal.signal(signal.SIGTERM, self._signal_handler)
 
     def _signal_handler(self, signum: int, frame: Any) -> None:
         """Handle shutdown signals."""
