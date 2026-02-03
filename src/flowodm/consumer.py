@@ -282,8 +282,13 @@ class AsyncConsumerLoop:
         """
         # Setup signal handlers for asyncio
         loop = asyncio.get_running_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, self.stop)
+        try:
+            for sig in (signal.SIGTERM, signal.SIGINT):
+                loop.add_signal_handler(sig, self.stop)
+        except NotImplementedError:
+            # Windows doesn't support add_signal_handler on ProactorEventLoop
+            # Fall back to signal.signal() for SIGINT (Ctrl+C)
+            signal.signal(signal.SIGINT, lambda signum, frame: self.stop())
 
         # Call startup hook
         if self.on_startup:
