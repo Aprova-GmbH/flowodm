@@ -275,5 +275,5 @@ This makes the release process much faster and simpler than libraries requiring 
 ## Contact
 
 For questions about publishing or releases:
-- Email: andrey@aprova.ai
+- Email: andy-v-github@outlook.com
 - GitHub Issues: https://github.com/Aprova-GmbH/flowodm/issues

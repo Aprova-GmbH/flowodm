@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 authors = [
-    { name = "Andrey Vykhodtsev", email = "andrey@aprova.ai" }
+    { name = "Andrey Vykhodtsev", email = "andy-v-github@outlook.com" }
 ]
 keywords = ["kafka", "avro", "pydantic", "odm", "schema-registry", "streaming"]
 classifiers = [

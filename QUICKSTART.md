@@ -487,4 +487,4 @@ docker run -d \
 
 - **Documentation**: https://flowodm.readthedocs.io
 - **GitHub Issues**: https://github.com/Aprova-GmbH/flowodm/issues
-- **Email**: andrey@aprova.ai
+- **Email**: andy-v-github@outlook.com
