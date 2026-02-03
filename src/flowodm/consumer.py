@@ -53,7 +53,7 @@ class ConsumerLoop:
         error_handler: Callable[[Exception, Any], None] | None = None,
         on_startup: Callable[[], None] | None = None,
         on_shutdown: Callable[[], None] | None = None,
-        commit_strategy: str = "per_message",
+        commit_strategy: str = "before_processing",
         max_retries: int = 3,
         retry_delay: float = 1.0,
         poll_timeout: float = 1.0,
@@ -69,7 +69,11 @@ class ConsumerLoop:
             error_handler: Optional function to handle processing errors
             on_startup: Optional function called before loop starts
             on_shutdown: Optional function called after loop stops
-            commit_strategy: "per_message", "per_batch", or "manual"
+            commit_strategy: Commit timing strategy:
+                - "before_processing": Commit before handler execution (prevents duplicates
+                  in parallel deployments, at-most-once delivery)
+                - "after_processing": Commit after successful processing (at-least-once
+                  delivery, may cause duplicates in parallel deployments)
             max_retries: Maximum retry attempts for failed messages
             retry_delay: Delay between retries in seconds
             poll_timeout: Kafka poll timeout in seconds
@@ -81,10 +85,18 @@ class ConsumerLoop:
         self.error_handler = error_handler
         self.on_startup = on_startup
         self.on_shutdown = on_shutdown
-        self.commit_strategy = commit_strategy
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.poll_timeout = poll_timeout
+
+        # Validate commit strategy
+        VALID_STRATEGIES = {"before_processing", "after_processing"}
+        if commit_strategy not in VALID_STRATEGIES:
+            raise ValueError(
+                f"Invalid commit_strategy: {commit_strategy}. " f"Must be one of {VALID_STRATEGIES}"
+            )
+
+        self.commit_strategy = commit_strategy
 
         self._running = False
         self._consumer: Any = None
@@ -159,8 +171,40 @@ class ConsumerLoop:
 
             logger.info("Consumer loop stopped")
 
+    def _commit_offset(self, msg: Any, max_attempts: int = 3) -> bool:
+        """
+        Commit message offset with retry logic.
+
+        Args:
+            msg: Kafka message to commit
+            max_attempts: Maximum number of commit attempts
+
+        Returns:
+            True if commit succeeded, False otherwise
+        """
+        import time
+
+        for attempt in range(max_attempts):
+            try:
+                self._consumer.commit(msg)
+                return True
+            except Exception as e:
+                if attempt == max_attempts - 1:
+                    logger.error(f"Failed to commit offset after {max_attempts} attempts: {e}")
+                    return False
+                time.sleep(0.1 * (2**attempt))  # Exponential backoff
+        return False
+
     def _process_message(self, msg: Any) -> None:
         """Process a single message with retry logic."""
+        import time
+
+        # Early commit for before_processing strategy
+        if self.commit_strategy == "before_processing":
+            if not self._commit_offset(msg):
+                logger.error("Skipping message due to commit failure")
+                return
+
         retries = 0
 
         while retries <= self.max_retries:
@@ -174,9 +218,9 @@ class ConsumerLoop:
                 # Call handler
                 self.handler(instance)
 
-                # Commit based on strategy
-                if self.commit_strategy == "per_message":
-                    self._consumer.commit(msg)
+                # Late commit for after_processing strategy
+                if self.commit_strategy == "after_processing":
+                    self._commit_offset(msg)
 
                 return
 
@@ -195,15 +239,13 @@ class ConsumerLoop:
                         except Exception as handler_error:
                             logger.error(f"Error handler failed: {handler_error}")
 
-                    # Commit failed message to not block
-                    if self.commit_strategy == "per_message":
-                        self._consumer.commit(msg)
+                    # Only commit on failure if using after_processing
+                    if self.commit_strategy == "after_processing":
+                        self._commit_offset(msg)
 
                     return
 
                 # Wait before retry
-                import time
-
                 time.sleep(self.retry_delay)
 
 
@@ -235,7 +277,7 @@ class AsyncConsumerLoop:
         on_startup: Callable[[], Awaitable[None]] | None = None,
         on_shutdown: Callable[[], Awaitable[None]] | None = None,
         max_concurrent: int = 10,
-        commit_strategy: str = "per_message",
+        commit_strategy: str = "before_processing",
         max_retries: int = 3,
         retry_delay: float = 1.0,
         poll_timeout: float = 1.0,
@@ -252,7 +294,11 @@ class AsyncConsumerLoop:
             on_startup: Optional async function called before loop starts
             on_shutdown: Optional async function called after loop stops
             max_concurrent: Maximum concurrent message processing tasks
-            commit_strategy: "per_message", "per_batch", or "manual"
+            commit_strategy: Commit timing strategy:
+                - "before_processing": Commit before handler execution (prevents duplicates
+                  in parallel deployments, at-most-once delivery)
+                - "after_processing": Commit after successful processing (at-least-once
+                  delivery, may cause duplicates in parallel deployments)
             max_retries: Maximum retry attempts
             retry_delay: Delay between retries
             poll_timeout: Kafka poll timeout
@@ -265,10 +311,18 @@ class AsyncConsumerLoop:
         self.on_startup = on_startup
         self.on_shutdown = on_shutdown
         self.max_concurrent = max_concurrent
-        self.commit_strategy = commit_strategy
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.poll_timeout = poll_timeout
+
+        # Validate commit strategy
+        VALID_STRATEGIES = {"before_processing", "after_processing"}
+        if commit_strategy not in VALID_STRATEGIES:
+            raise ValueError(
+                f"Invalid commit_strategy: {commit_strategy}. " f"Must be one of {VALID_STRATEGIES}"
+            )
+
+        self.commit_strategy = commit_strategy
 
         self._running = False
         self._consumer: Any = None
@@ -370,8 +424,36 @@ class AsyncConsumerLoop:
             if self._semaphore:
                 self._semaphore.release()
 
+    async def _commit_offset(self, msg: Any, max_attempts: int = 3) -> bool:
+        """
+        Commit message offset with retry logic.
+
+        Args:
+            msg: Kafka message to commit
+            max_attempts: Maximum number of commit attempts
+
+        Returns:
+            True if commit succeeded, False otherwise
+        """
+        for attempt in range(max_attempts):
+            try:
+                self._consumer.commit(msg)
+                return True
+            except Exception as e:
+                if attempt == max_attempts - 1:
+                    logger.error(f"Failed to commit offset after {max_attempts} attempts: {e}")
+                    return False
+                await asyncio.sleep(0.1 * (2**attempt))  # Exponential backoff
+        return False
+
     async def _process_message(self, msg: Any) -> None:
         """Process a single message with retry logic."""
+        # Early commit for before_processing strategy
+        if self.commit_strategy == "before_processing":
+            if not await self._commit_offset(msg):
+                logger.error("Skipping message due to commit failure")
+                return
+
         retries = 0
 
         while retries <= self.max_retries:
@@ -385,9 +467,9 @@ class AsyncConsumerLoop:
                 # Call handler
                 await self.handler(instance)
 
-                # Commit based on strategy
-                if self.commit_strategy == "per_message":
-                    self._consumer.commit(msg)
+                # Late commit for after_processing strategy
+                if self.commit_strategy == "after_processing":
+                    await self._commit_offset(msg)
 
                 return
 
@@ -406,9 +488,9 @@ class AsyncConsumerLoop:
                         except Exception as handler_error:
                             logger.error(f"Async error handler failed: {handler_error}")
 
-                    # Commit failed message
-                    if self.commit_strategy == "per_message":
-                        self._consumer.commit(msg)
+                    # Only commit on failure if using after_processing
+                    if self.commit_strategy == "after_processing":
+                        await self._commit_offset(msg)
 
                     return
 

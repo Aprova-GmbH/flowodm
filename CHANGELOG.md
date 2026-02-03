@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - Unreleased
+
+### Added
+- New `commit_strategy="before_processing"` to prevent duplicate processing in parallel pod deployments
+- New `commit_strategy="after_processing"` as explicit name for traditional commit-after-processing behavior
+- Commit retry logic with exponential backoff for transient failures
+- Comprehensive documentation on commit strategies and delivery semantics in docs/consumer_loops.rst
+- Strategy validation that raises ValueError for invalid commit_strategy values
+
+### Changed
+- **BREAKING**: Removed `commit_strategy="per_message"` option (replaced by explicit `"before_processing"` and `"after_processing"`)
+- **BREAKING**: Default `commit_strategy` is now `"before_processing"` to prevent duplicates in parallel deployments
+- Updated examples and README to show recommended `before_processing` strategy for parallel deployments
+
+### Migration Guide
+- **Default behavior changed**: New default is `commit_strategy="before_processing"` (prevents duplicates in parallel deployments)
+- **Removed option**: `commit_strategy="per_message"` is no longer supported - use `"after_processing"` instead
+- To restore old behavior, explicitly set `commit_strategy="after_processing"`
+- For guaranteed delivery (no message loss), use `commit_strategy="after_processing"`
+- Update handlers to be idempotent when using `before_processing` strategy (now the default)
+
 ## [0.1.1] - 2026-01-28
 
 ### Added

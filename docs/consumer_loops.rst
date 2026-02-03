@@ -87,6 +87,44 @@ Configure automatic retries:
        error_handler=handle_error,  # Called after all retries exhausted
    )
 
+Commit Strategies
+-----------------
+
+Control when message offsets are committed to prevent duplicates or ensure reliability:
+
+**before_processing** (Recommended for parallel deployments):
+Commits immediately after receiving, before handler execution. Prevents duplicate processing
+in parallel pod deployments but may lose messages if processing fails (at-most-once delivery).
+
+**after_processing** (Recommended for single consumer):
+Commits after successful processing. Guarantees at-least-once delivery but may cause
+duplicates in parallel deployments.
+
+Example:
+
+.. code-block:: python
+
+   # Prevent duplicates in Kubernetes/parallel deployments
+   loop = ConsumerLoop(
+       model=OrderEvent,
+       handler=process_order,
+       commit_strategy="before_processing",
+   )
+
+   # Guarantee no message loss (may process duplicates)
+   loop = ConsumerLoop(
+       model=OrderEvent,
+       handler=process_order,
+       commit_strategy="after_processing",
+   )
+
+**Best Practices:**
+
+- Use ``before_processing`` when running multiple consumer instances in parallel
+- Make handlers idempotent when possible
+- Use ``error_handler`` to capture failed messages for dead letter queue
+- Monitor failed commits in logs/metrics
+
 Lifecycle Hooks
 ---------------
 
