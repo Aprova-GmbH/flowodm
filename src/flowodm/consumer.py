@@ -69,11 +69,10 @@ class ConsumerLoop:
             error_handler: Optional function to handle processing errors
             on_startup: Optional function called before loop starts
             on_shutdown: Optional function called after loop stops
-            commit_strategy: Commit timing strategy:
-                - "before_processing": Commit before handler execution (prevents duplicates
-                  in parallel deployments, at-most-once delivery)
-                - "after_processing": Commit after successful processing (at-least-once
-                  delivery, may cause duplicates in parallel deployments)
+            commit_strategy: Commit timing strategy. Use "before_processing" to commit before
+                handler execution (at-most-once, prevents duplicates in parallel deployments),
+                or "after_processing" to commit after successful processing (at-least-once,
+                may cause duplicates in parallel deployments).
             max_retries: Maximum retry attempts for failed messages
             retry_delay: Delay between retries in seconds
             poll_timeout: Kafka poll timeout in seconds
@@ -294,11 +293,10 @@ class AsyncConsumerLoop:
             on_startup: Optional async function called before loop starts
             on_shutdown: Optional async function called after loop stops
             max_concurrent: Maximum concurrent message processing tasks
-            commit_strategy: Commit timing strategy:
-                - "before_processing": Commit before handler execution (prevents duplicates
-                  in parallel deployments, at-most-once delivery)
-                - "after_processing": Commit after successful processing (at-least-once
-                  delivery, may cause duplicates in parallel deployments)
+            commit_strategy: Commit timing strategy. Use "before_processing" to commit before
+                handler execution (at-most-once, prevents duplicates in parallel deployments),
+                or "after_processing" to commit after successful processing (at-least-once,
+                may cause duplicates in parallel deployments).
             max_retries: Maximum retry attempts
             retry_delay: Delay between retries
             poll_timeout: Kafka poll timeout
