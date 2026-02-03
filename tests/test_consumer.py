@@ -140,11 +140,7 @@ class TestAsyncConsumerLoopWindowsCompatibility:
                     loop.stop()
 
                 # Run both the consumer loop and the stop task
-                await asyncio.gather(
-                    loop.run(),
-                    stop_after_start(),
-                    return_exceptions=True
-                )
+                await asyncio.gather(loop.run(), stop_after_start(), return_exceptions=True)
 
         # Verify signal.signal was called as fallback for SIGINT
         assert len(signal_calls) == 1
@@ -186,11 +182,7 @@ class TestAsyncConsumerLoopWindowsCompatibility:
                 loop.stop()
 
             # Run both the consumer loop and the stop task
-            await asyncio.gather(
-                loop.run(),
-                stop_after_start(),
-                return_exceptions=True
-            )
+            await asyncio.gather(loop.run(), stop_after_start(), return_exceptions=True)
 
         # Verify add_signal_handler was called for both SIGTERM and SIGINT
         assert len(signal_handler_calls) == 2

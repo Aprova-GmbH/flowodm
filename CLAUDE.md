@@ -39,6 +39,9 @@ uv run pytest --cov=flowodm --cov-report=html
 ```
 
 ### Code Quality
+
+Before commiting, make sure to run the following commands locally to ensure code quality.
+
 ```bash
 # Format code (line length: 100)
 uv run black src tests
