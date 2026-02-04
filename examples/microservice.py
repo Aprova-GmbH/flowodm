@@ -66,9 +66,17 @@ def process_order(order: OrderEvent) -> None:
     logger.info(f"Order {order.order_id} processed successfully")
 
 
-def handle_error(error: Exception, raw_message) -> None:
+def handle_error(
+    error: Exception, raw_message, deserialized: OrderEvent | None
+) -> None:
     """
     Handle processing errors.
+
+    Args:
+        error: The exception that occurred
+        raw_message: The raw Kafka message
+        deserialized: The deserialized OrderEvent if deserialization succeeded,
+            None if deserialization failed
 
     Options for error handling:
     - Log and continue (current behavior)
@@ -76,7 +84,12 @@ def handle_error(error: Exception, raw_message) -> None:
     - Alert operations team
     - Retry with backoff
     """
-    logger.error(f"Failed to process message: {error}")
+    if deserialized is not None:
+        # Handler failed but we have the deserialized message
+        logger.error(f"Failed to process order {deserialized.order_id}: {error}")
+    else:
+        # Deserialization failed
+        logger.error(f"Failed to deserialize message: {error}")
     # In production, you might:
     # - Send to a dead letter topic
     # - Store in a failed messages database

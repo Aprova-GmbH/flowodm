@@ -54,17 +54,28 @@ Basic Consumer Loop
 Error Handling
 --------------
 
-Provide a custom error handler:
+Provide a custom error handler. The handler receives three arguments:
+
+- ``error``: The exception that occurred
+- ``raw_message``: The raw Kafka message
+- ``deserialized``: The deserialized ``FlowBaseModel`` instance if deserialization
+  succeeded (but the handler failed), or ``None`` if deserialization itself failed
 
 .. code-block:: python
 
-   def handle_error(error: Exception, raw_message) -> None:
-       print(f"Failed to process message: {error}")
+   def handle_error(
+       error: Exception, raw_message, deserialized: OrderEvent | None
+   ) -> None:
+       if deserialized is not None:
+           # Handler failed but we have the deserialized message
+           print(f"Failed to process order {deserialized.order_id}: {error}")
+       else:
+           # Deserialization failed
+           print(f"Failed to deserialize message: {error}")
        # Options:
        # - Log and continue
        # - Send to dead letter queue
        # - Alert operations team
-       # - Retry logic
 
    loop = ConsumerLoop(
        model=OrderEvent,
@@ -292,8 +303,13 @@ Complete Microservice Example
        # Business logic here
        processed_count += 1
 
-   def handle_error(error: Exception, raw) -> None:
-       logger.error(f"Failed to process: {error}")
+   def handle_error(
+       error: Exception, raw, deserialized: OrderEvent | None
+   ) -> None:
+       if deserialized is not None:
+           logger.error(f"Failed to process order {deserialized.order_id}: {error}")
+       else:
+           logger.error(f"Failed to deserialize: {error}")
        # Send to dead letter queue, alert, etc.
 
    def on_startup() -> None:
