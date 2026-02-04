@@ -50,7 +50,7 @@ class ConsumerLoop:
         handler: Callable[[Any], None],
         settings: BaseSettings | None = None,
         group_id: str | None = None,
-        error_handler: Callable[[Exception, Any], None] | None = None,
+        error_handler: Callable[[Exception, Any, FlowBaseModel | None], None] | None = None,
         on_startup: Callable[[], None] | None = None,
         on_shutdown: Callable[[], None] | None = None,
         commit_strategy: str = "before_processing",
@@ -66,7 +66,9 @@ class ConsumerLoop:
             handler: Function to process each message
             settings: Kafka settings profile (defaults to LongRunningSettings)
             group_id: Consumer group ID (uses model's Settings if not specified)
-            error_handler: Optional function to handle processing errors
+            error_handler: Optional function to handle processing errors. Receives
+                (exception, raw_message, deserialized_instance). The deserialized_instance
+                is None if deserialization failed, otherwise contains the FlowBaseModel.
             on_startup: Optional function called before loop starts
             on_shutdown: Optional function called after loop stops
             commit_strategy: Commit timing strategy. Use "before_processing" to commit before
@@ -205,6 +207,7 @@ class ConsumerLoop:
                 return
 
         retries = 0
+        instance: FlowBaseModel | None = None
 
         while retries <= self.max_retries:
             try:
@@ -234,7 +237,7 @@ class ConsumerLoop:
 
                     if self.error_handler:
                         try:
-                            self.error_handler(e, msg)
+                            self.error_handler(e, msg, instance)
                         except Exception as handler_error:
                             logger.error(f"Error handler failed: {handler_error}")
 
@@ -272,7 +275,9 @@ class AsyncConsumerLoop:
         handler: Callable[[Any], Awaitable[None]],
         settings: BaseSettings | None = None,
         group_id: str | None = None,
-        error_handler: Callable[[Exception, Any], Awaitable[None]] | None = None,
+        error_handler: (
+            Callable[[Exception, Any, FlowBaseModel | None], Awaitable[None]] | None
+        ) = None,
         on_startup: Callable[[], Awaitable[None]] | None = None,
         on_shutdown: Callable[[], Awaitable[None]] | None = None,
         max_concurrent: int = 10,
@@ -289,7 +294,9 @@ class AsyncConsumerLoop:
             handler: Async function to process each message
             settings: Kafka settings profile
             group_id: Consumer group ID
-            error_handler: Optional async function to handle errors
+            error_handler: Optional async function to handle errors. Receives
+                (exception, raw_message, deserialized_instance). The deserialized_instance
+                is None if deserialization failed, otherwise contains the FlowBaseModel.
             on_startup: Optional async function called before loop starts
             on_shutdown: Optional async function called after loop stops
             max_concurrent: Maximum concurrent message processing tasks
@@ -453,6 +460,7 @@ class AsyncConsumerLoop:
                 return
 
         retries = 0
+        instance: FlowBaseModel | None = None
 
         while retries <= self.max_retries:
             try:
@@ -482,7 +490,7 @@ class AsyncConsumerLoop:
 
                     if self.error_handler:
                         try:
-                            await self.error_handler(e, msg)
+                            await self.error_handler(e, msg, instance)
                         except Exception as handler_error:
                             logger.error(f"Async error handler failed: {handler_error}")
 

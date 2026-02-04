@@ -606,3 +606,164 @@ class TestAsyncCommitStrategies:
         # Verify commit was retried and eventually succeeded
         assert result is True
         assert commit_attempt_count == 3
+
+
+@pytest.mark.unit
+class TestErrorHandlerDeserializedMessage:
+    """Tests for error handler receiving deserialized message parameter."""
+
+    def test_sync_error_handler_receives_none_on_deserialization_failure(self):
+        """Test that sync error handler receives None when deserialization fails."""
+        mock_model = MagicMock()
+        mock_model._deserialize_avro.side_effect = Exception("Deserialization failed")
+
+        mock_handler = MagicMock()
+
+        # Track error handler calls
+        error_handler_calls = []
+
+        def track_error_handler(error, raw_msg, deserialized):
+            error_handler_calls.append((error, raw_msg, deserialized))
+
+        mock_consumer = MagicMock()
+
+        loop = ConsumerLoop(
+            model=mock_model,
+            handler=mock_handler,
+            error_handler=track_error_handler,
+            commit_strategy="after_processing",
+            max_retries=0,  # No retries for faster test
+        )
+        loop._consumer = mock_consumer
+
+        mock_msg = MagicMock()
+        mock_msg.value.return_value = b"invalid_data"
+
+        with patch("flowodm.consumer.logger"):
+            loop._process_message(mock_msg)
+
+        # Verify error handler was called with None for deserialized
+        assert len(error_handler_calls) == 1
+        error, raw_msg, deserialized = error_handler_calls[0]
+        assert str(error) == "Deserialization failed"
+        assert raw_msg is mock_msg
+        assert deserialized is None
+
+        # Verify the actual handler was never called
+        mock_handler.assert_not_called()
+
+    def test_sync_error_handler_receives_instance_on_handler_failure(self):
+        """Test that sync error handler receives deserialized instance when handler fails."""
+        mock_model = MagicMock()
+        mock_instance = MagicMock()
+        mock_model._deserialize_avro.return_value = mock_instance
+
+        def failing_handler(_data):
+            raise Exception("Handler failed")
+
+        # Track error handler calls
+        error_handler_calls = []
+
+        def track_error_handler(error, raw_msg, deserialized):
+            error_handler_calls.append((error, raw_msg, deserialized))
+
+        mock_consumer = MagicMock()
+
+        loop = ConsumerLoop(
+            model=mock_model,
+            handler=failing_handler,
+            error_handler=track_error_handler,
+            commit_strategy="after_processing",
+            max_retries=0,  # No retries for faster test
+        )
+        loop._consumer = mock_consumer
+
+        mock_msg = MagicMock()
+        mock_msg.value.return_value = b"valid_data"
+
+        with patch("flowodm.consumer.logger"):
+            loop._process_message(mock_msg)
+
+        # Verify error handler was called with the deserialized instance
+        assert len(error_handler_calls) == 1
+        error, raw_msg, deserialized = error_handler_calls[0]
+        assert str(error) == "Handler failed"
+        assert raw_msg is mock_msg
+        assert deserialized is mock_instance
+
+    async def test_async_error_handler_receives_none_on_deserialization_failure(self):
+        """Test that async error handler receives None when deserialization fails."""
+        mock_model = MagicMock()
+        mock_model._deserialize_avro.side_effect = Exception("Deserialization failed")
+
+        async def mock_handler(_data):
+            pass
+
+        # Track error handler calls
+        error_handler_calls = []
+
+        async def track_error_handler(error, raw_msg, deserialized):
+            error_handler_calls.append((error, raw_msg, deserialized))
+
+        mock_consumer = MagicMock()
+
+        loop = AsyncConsumerLoop(
+            model=mock_model,
+            handler=mock_handler,
+            error_handler=track_error_handler,
+            commit_strategy="after_processing",
+            max_retries=0,  # No retries for faster test
+        )
+        loop._consumer = mock_consumer
+
+        mock_msg = MagicMock()
+        mock_msg.value.return_value = b"invalid_data"
+
+        with patch("flowodm.consumer.logger"):
+            await loop._process_message(mock_msg)
+
+        # Verify error handler was called with None for deserialized
+        assert len(error_handler_calls) == 1
+        error, raw_msg, deserialized = error_handler_calls[0]
+        assert str(error) == "Deserialization failed"
+        assert raw_msg is mock_msg
+        assert deserialized is None
+
+    async def test_async_error_handler_receives_instance_on_handler_failure(self):
+        """Test that async error handler receives deserialized instance when handler fails."""
+        mock_model = MagicMock()
+        mock_instance = MagicMock()
+        mock_model._deserialize_avro.return_value = mock_instance
+
+        async def failing_handler(_data):
+            raise Exception("Handler failed")
+
+        # Track error handler calls
+        error_handler_calls = []
+
+        async def track_error_handler(error, raw_msg, deserialized):
+            error_handler_calls.append((error, raw_msg, deserialized))
+
+        mock_consumer = MagicMock()
+
+        loop = AsyncConsumerLoop(
+            model=mock_model,
+            handler=failing_handler,
+            error_handler=track_error_handler,
+            commit_strategy="after_processing",
+            max_retries=0,  # No retries for faster test
+        )
+        loop._consumer = mock_consumer
+
+        mock_msg = MagicMock()
+        mock_msg.value.return_value = b"valid_data"
+
+        with patch("flowodm.consumer.logger"):
+            await loop._process_message(mock_msg)
+
+        # Verify error handler was called with the deserialized instance
+        assert len(error_handler_calls) == 1
+        error, raw_msg, deserialized = error_handler_calls[0]
+        assert str(error) == "Handler failed"
+        assert raw_msg is mock_msg
+        assert deserialized is mock_instance
