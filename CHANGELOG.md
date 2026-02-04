@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-02-04
+
+### Added
+- Deserialized message instance as third parameter to error handlers in both `ConsumerLoop` and `AsyncConsumerLoop` ([#5](https://github.com/Aprova-GmbH/flowodm/pull/5))
+- Error handlers can now distinguish between deserialization failures (`deserialized=None`) and handler failures (`deserialized=FlowBaseModel`)
+- Enhanced error handling examples in documentation and example code
+
+### Changed
+- **BREAKING**: Error handler signature changed from `(Exception, Any)` to `(Exception, Any, FlowBaseModel | None)`
+- Updated `examples/microservice.py` to demonstrate new error handler pattern
+- Enhanced documentation in `docs/consumer_loops.rst` with error handling scenarios
+
+### Migration Guide
+- Update error handler functions to accept a third parameter for the deserialized instance
+- Old signature: `def error_handler(error: Exception, raw_message: Any) -> None`
+- New signature: `def error_handler(error: Exception, raw_message: Any, deserialized: FlowBaseModel | None) -> None`
+
 ## [0.2.0] - 2026-02-03
 
 ### Added
