@@ -33,6 +33,14 @@ from flowodm.settings import BaseSettings
 
 T = TypeVar("T", bound="FlowBaseModel")
 
+# Confluent wire format constants
+# Confluent Kafka messages use a wire format with:
+# - Byte 0: Magic byte (0x00)
+# - Bytes 1-4: Schema ID (big-endian 4-byte integer)
+# - Bytes 5+: Actual Avro serialized data
+CONFLUENT_MAGIC_BYTE = 0x00
+CONFLUENT_HEADER_SIZE = 5  # 1 byte magic + 4 bytes schema ID
+
 
 def generate_message_id() -> str:
     """Generate a unique message ID using UUID4."""
@@ -260,14 +268,60 @@ class FlowBaseModel(BaseModel):
             raise SerializationError(f"Failed to serialize to Avro: {e}") from e
 
     @classmethod
+    def _strip_confluent_header(cls, data: bytes) -> bytes:
+        """
+        Strip Confluent wire format header if present.
+
+        Confluent Kafka messages use a wire format with:
+        - Byte 0: Magic byte (0x00)
+        - Bytes 1-4: Schema ID (big-endian 4-byte integer)
+        - Bytes 5+: Actual Avro serialized data
+
+        This method detects and removes this header, returning pure Avro bytes.
+
+        Args:
+            data: Raw message bytes (may include Confluent header)
+
+        Returns:
+            Pure Avro bytes without the Confluent header
+        """
+        if len(data) >= CONFLUENT_HEADER_SIZE and data[0] == CONFLUENT_MAGIC_BYTE:
+            return data[CONFLUENT_HEADER_SIZE:]
+        return data
+
+    @classmethod
     def _deserialize_avro(cls: type[T], data: bytes) -> T:
-        """Deserialize Avro bytes to model instance."""
+        """
+        Deserialize Avro bytes to model instance.
+
+        Automatically handles both pure Avro format and Confluent wire format
+        (which includes a 5-byte header with magic byte and schema ID).
+
+        Args:
+            data: Avro bytes (with or without Confluent header)
+
+        Returns:
+            Model instance
+        """
         schema = cls._get_avro_schema()
-        input_stream = io.BytesIO(data)
+        # Strip Confluent wire format header if present
+        avro_data = cls._strip_confluent_header(data)
+        input_stream = io.BytesIO(avro_data)
 
         try:
             record: dict[str, Any] = fastavro.schemaless_reader(input_stream, schema)  # type: ignore[assignment,call-arg]
+
+            # Validate all bytes were consumed (catches wire format mismatches)
+            bytes_read = input_stream.tell()
+            if bytes_read != len(avro_data):
+                raise DeserializationError(
+                    f"Incomplete deserialization: read {bytes_read} of {len(avro_data)} bytes. "
+                    "This may indicate a wire format mismatch or schema incompatibility."
+                )
+
             return cls._from_avro_dict(record)
+        except DeserializationError:
+            raise
         except Exception as e:
             raise DeserializationError(f"Failed to deserialize from Avro: {e}") from e
 

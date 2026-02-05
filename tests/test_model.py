@@ -383,6 +383,51 @@ class TestSerializationErrors:
         assert result.name == "test"
         assert result.message_id == event.message_id
 
+    def test_strip_confluent_header(self):
+        """Test stripping Confluent wire format header."""
+        # Create pure Avro data
+        event = MinimalModel(name="test")
+        pure_avro_data = event._serialize_avro()
+
+        # Create Confluent wire format: magic byte (0x00) + 4-byte schema ID + Avro data
+        schema_id = 12345
+        confluent_data = bytes([0x00]) + schema_id.to_bytes(4, "big") + pure_avro_data
+
+        # Strip should return pure Avro data
+        stripped = MinimalModel._strip_confluent_header(confluent_data)
+        assert stripped == pure_avro_data
+
+    def test_strip_confluent_header_preserves_pure_avro(self):
+        """Test that pure Avro data (without Confluent header) is preserved."""
+        event = MinimalModel(name="test")
+        pure_avro_data = event._serialize_avro()
+
+        # Pure Avro data should not be modified (first byte is not 0x00)
+        stripped = MinimalModel._strip_confluent_header(pure_avro_data)
+        assert stripped == pure_avro_data
+
+    def test_strip_confluent_header_short_data(self):
+        """Test that short data (less than 5 bytes) is preserved."""
+        short_data = bytes([0x00, 0x01, 0x02])  # Only 3 bytes, even though starts with 0x00
+
+        stripped = MinimalModel._strip_confluent_header(short_data)
+        assert stripped == short_data
+
+    def test_deserialize_avro_with_confluent_header(self):
+        """Test deserialization of messages with Confluent wire format header."""
+        event = MinimalModel(name="confluent_test")
+        pure_avro_data = event._serialize_avro()
+
+        # Create Confluent wire format: magic byte (0x00) + 4-byte schema ID + Avro data
+        schema_id = 42
+        confluent_data = bytes([0x00]) + schema_id.to_bytes(4, "big") + pure_avro_data
+
+        # Should deserialize correctly despite the header
+        result = MinimalModel._deserialize_avro(confluent_data)
+
+        assert result.name == "confluent_test"
+        assert result.message_id == event.message_id
+
     def test_get_avro_schema_from_path(self, tmp_path):
         """Test loading schema from file path."""
         import json
@@ -528,6 +573,21 @@ class TestErrorHandling:
         # Invalid bytes that can't be deserialized
         with pytest.raises(DeserializationError):
             MinimalModel._deserialize_avro(b"invalid data")
+
+    def test_deserialize_avro_detects_extra_bytes(self):
+        """Test that deserialization raises error when extra bytes remain."""
+        from flowodm.exceptions import DeserializationError
+
+        event = MinimalModel(name="test")
+        valid_avro = event._serialize_avro()
+
+        # Append garbage bytes - should be detected
+        corrupted_data = valid_avro + b"extra garbage"
+
+        with pytest.raises(DeserializationError) as exc_info:
+            MinimalModel._deserialize_avro(corrupted_data)
+
+        assert "Incomplete deserialization" in str(exc_info.value)
 
     def test_get_message_key_none_value(self):
         """Test getting message key when key field value is None."""
