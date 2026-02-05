@@ -290,7 +290,38 @@ class FlowBaseModel(BaseModel):
         return data
 
     @classmethod
-    def _deserialize_avro(cls: type[T], data: bytes) -> T:
+    def _validate_required_fields(cls, record: dict[str, Any]) -> None:
+        """
+        Validate that required string fields are not empty.
+
+        This helps detect deserialization issues where garbage data
+        was parsed, resulting in empty strings for required fields.
+
+        Args:
+            record: Deserialized Avro record
+
+        Raises:
+            DeserializationError: If required string fields are empty
+        """
+        empty_fields = []
+        for field_name, field_info in cls.model_fields.items():
+            # Skip optional fields and message_id (auto-generated)
+            if not field_info.is_required() or field_name == "message_id":
+                continue
+
+            # Check if required string field is empty
+            value = record.get(field_name)
+            if field_info.annotation is str and value == "":
+                empty_fields.append(field_name)
+
+        if empty_fields:
+            raise DeserializationError(
+                f"Required fields are empty after deserialization: {empty_fields}. "
+                "This may indicate a wire format mismatch or corrupted message data."
+            )
+
+    @classmethod
+    def _deserialize_avro(cls: type[T], data: bytes, validate: bool = True) -> T:
         """
         Deserialize Avro bytes to model instance.
 
@@ -299,9 +330,14 @@ class FlowBaseModel(BaseModel):
 
         Args:
             data: Avro bytes (with or without Confluent header)
+            validate: If True, validate that required fields are not empty.
+                     This helps detect wire format mismatches. Default: True.
 
         Returns:
             Model instance
+
+        Raises:
+            DeserializationError: If deserialization fails or required fields are empty
         """
         schema = cls._get_avro_schema()
         # Strip Confluent wire format header if present
@@ -310,7 +346,14 @@ class FlowBaseModel(BaseModel):
 
         try:
             record: dict[str, Any] = fastavro.schemaless_reader(input_stream, schema)  # type: ignore[assignment,call-arg]
+
+            # Validate required fields are not empty (catches wire format mismatches)
+            if validate:
+                cls._validate_required_fields(record)
+
             return cls._from_avro_dict(record)
+        except DeserializationError:
+            raise
         except Exception as e:
             raise DeserializationError(f"Failed to deserialize from Avro: {e}") from e
 
