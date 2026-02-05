@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-02-05
+
+### Changed
+- **BREAKING**: Default `max_retries` changed from `3` to `0` in both `ConsumerLoop` and `AsyncConsumerLoop`
+- Retry logic is now opt-in rather than opt-out
+- Retry-related log messages are suppressed when `max_retries=0`
+- Updated documentation to clarify opt-in retry configuration
+
+### Migration Guide
+- If you relied on the default retry behavior (3 retries), explicitly set `max_retries=3` in your consumer loop
+- Old default: `ConsumerLoop(model=MyModel, handler=handler)` would retry 3 times
+- New default: `ConsumerLoop(model=MyModel, handler=handler)` does not retry
+- To restore old behavior: `ConsumerLoop(model=MyModel, handler=handler, max_retries=3)`
+
 ## [0.2.1] - 2026-02-04
 
 ### Added

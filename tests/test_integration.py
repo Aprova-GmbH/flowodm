@@ -125,9 +125,9 @@ class TestSyncProduceConsume:
         # Consume message with explicit "earliest" setting
         consumed = TestModel.consume_one(timeout=10.0, settings=BaseSettings())
 
-        assert (
-            consumed is not None
-        ), "Failed to consume message - check Kafka consumer offset strategy"
+        assert consumed is not None, (
+            "Failed to consume message - check Kafka consumer offset strategy"
+        )
         assert consumed.event_id == event.event_id
         assert consumed.event_type == event.event_type
         assert consumed.payload == event.payload  # JSON string comparison
