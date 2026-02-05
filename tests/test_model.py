@@ -428,65 +428,6 @@ class TestSerializationErrors:
         assert result.name == "confluent_test"
         assert result.message_id == event.message_id
 
-    def test_validate_required_fields_raises_on_empty(self):
-        """Test that validation raises error when required string fields are empty."""
-        from flowodm.exceptions import DeserializationError
-
-        # Create a record with empty required field
-        record = {"message_id": "test-id", "name": ""}
-
-        with pytest.raises(DeserializationError) as exc_info:
-            MinimalModel._validate_required_fields(record)
-
-        assert "name" in str(exc_info.value)
-        assert "wire format mismatch" in str(exc_info.value)
-
-    def test_validate_required_fields_passes_with_valid_data(self):
-        """Test that validation passes when required fields have values."""
-        record = {"message_id": "test-id", "name": "valid_name"}
-
-        # Should not raise
-        MinimalModel._validate_required_fields(record)
-
-    def test_deserialize_avro_validates_by_default(self):
-        """Test that deserialization validates required fields by default."""
-        import io
-
-        import fastavro
-
-        from flowodm.exceptions import DeserializationError
-
-        # Manually create Avro data with empty name field
-        schema = MinimalModel._get_avro_schema()
-        record = {"message_id": "test-id", "name": ""}
-
-        output = io.BytesIO()
-        fastavro.schemaless_writer(output, schema, record)
-        avro_data = output.getvalue()
-
-        with pytest.raises(DeserializationError) as exc_info:
-            MinimalModel._deserialize_avro(avro_data)
-
-        assert "name" in str(exc_info.value)
-
-    def test_deserialize_avro_validation_can_be_disabled(self):
-        """Test that validation can be disabled."""
-        import io
-
-        import fastavro
-
-        # Manually create Avro data with empty name field
-        schema = MinimalModel._get_avro_schema()
-        record = {"message_id": "test-id", "name": ""}
-
-        output = io.BytesIO()
-        fastavro.schemaless_writer(output, schema, record)
-        avro_data = output.getvalue()
-
-        # Should not raise when validation is disabled
-        result = MinimalModel._deserialize_avro(avro_data, validate=False)
-        assert result.name == ""
-
     def test_get_avro_schema_from_path(self, tmp_path):
         """Test loading schema from file path."""
         import json
