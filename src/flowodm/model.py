@@ -310,7 +310,18 @@ class FlowBaseModel(BaseModel):
 
         try:
             record: dict[str, Any] = fastavro.schemaless_reader(input_stream, schema)  # type: ignore[assignment,call-arg]
+
+            # Validate all bytes were consumed (catches wire format mismatches)
+            bytes_read = input_stream.tell()
+            if bytes_read != len(avro_data):
+                raise DeserializationError(
+                    f"Incomplete deserialization: read {bytes_read} of {len(avro_data)} bytes. "
+                    "This may indicate a wire format mismatch or schema incompatibility."
+                )
+
             return cls._from_avro_dict(record)
+        except DeserializationError:
+            raise
         except Exception as e:
             raise DeserializationError(f"Failed to deserialize from Avro: {e}") from e
 

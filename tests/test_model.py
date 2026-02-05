@@ -574,6 +574,21 @@ class TestErrorHandling:
         with pytest.raises(DeserializationError):
             MinimalModel._deserialize_avro(b"invalid data")
 
+    def test_deserialize_avro_detects_extra_bytes(self):
+        """Test that deserialization raises error when extra bytes remain."""
+        from flowodm.exceptions import DeserializationError
+
+        event = MinimalModel(name="test")
+        valid_avro = event._serialize_avro()
+
+        # Append garbage bytes - should be detected
+        corrupted_data = valid_avro + b"extra garbage"
+
+        with pytest.raises(DeserializationError) as exc_info:
+            MinimalModel._deserialize_avro(corrupted_data)
+
+        assert "Incomplete deserialization" in str(exc_info.value)
+
     def test_get_message_key_none_value(self):
         """Test getting message key when key field value is None."""
 
