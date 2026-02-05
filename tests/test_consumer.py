@@ -29,7 +29,7 @@ class TestConsumerLoop:
         assert loop.model is mock_model
         assert loop.handler is mock_handler
         assert loop._running is False
-        assert loop.max_retries == 3
+        assert loop.max_retries == 0
         assert loop.retry_delay == 1.0
         assert loop.poll_timeout == 1.0
         assert loop.commit_strategy == "before_processing"
@@ -147,7 +147,7 @@ class TestAsyncConsumerLoop:
         assert loop.handler is mock_handler
         assert loop._running is False
         assert loop.max_concurrent == 10
-        assert loop.max_retries == 3
+        assert loop.max_retries == 0
         assert loop.retry_delay == 1.0
         assert loop.poll_timeout == 1.0
         assert loop.commit_strategy == "before_processing"
@@ -606,6 +606,108 @@ class TestAsyncCommitStrategies:
         # Verify commit was retried and eventually succeeded
         assert result is True
         assert commit_attempt_count == 3
+
+
+@pytest.mark.unit
+class TestRetryLogSuppression:
+    """Tests for retry log suppression when max_retries=0."""
+
+    def test_no_retry_logs_when_max_retries_zero(self):
+        """Test that no retry logs are emitted when max_retries=0."""
+        mock_model = MagicMock()
+        mock_model._deserialize_avro.return_value = {"test": "data"}
+
+        def failing_handler(_data):
+            raise Exception("Handler failed")
+
+        mock_consumer = MagicMock()
+
+        loop = ConsumerLoop(
+            model=mock_model,
+            handler=failing_handler,
+            commit_strategy="after_processing",
+            max_retries=0,
+        )
+        loop._consumer = mock_consumer
+
+        mock_msg = MagicMock()
+        mock_msg.value.return_value = b"test_data"
+
+        with patch("flowodm.consumer.logger") as mock_logger:
+            loop._process_message(mock_msg)
+
+            # Verify no warning logs about retry attempts
+            warning_logs = [call_args[0][0] for call_args in mock_logger.warning.call_args_list]
+            assert not any("attempt" in log for log in warning_logs)
+
+            # Verify no error logs about max retries exceeded
+            error_logs = [call_args[0][0] for call_args in mock_logger.error.call_args_list]
+            assert not any("Max retries exceeded" in log for log in error_logs)
+
+    def test_retry_logs_when_max_retries_positive(self):
+        """Test that retry logs are emitted when max_retries > 0."""
+        mock_model = MagicMock()
+        mock_model._deserialize_avro.return_value = {"test": "data"}
+
+        def failing_handler(_data):
+            raise Exception("Handler failed")
+
+        mock_consumer = MagicMock()
+
+        loop = ConsumerLoop(
+            model=mock_model,
+            handler=failing_handler,
+            commit_strategy="after_processing",
+            max_retries=1,
+        )
+        loop._consumer = mock_consumer
+
+        mock_msg = MagicMock()
+        mock_msg.value.return_value = b"test_data"
+
+        with patch("flowodm.consumer.logger") as mock_logger:
+            with patch("time.sleep"):  # Speed up test
+                loop._process_message(mock_msg)
+
+            # Verify warning logs about retry attempts are present
+            warning_logs = [call_args[0][0] for call_args in mock_logger.warning.call_args_list]
+            assert any("attempt" in log for log in warning_logs)
+
+            # Verify error log about max retries exceeded is present
+            error_logs = [call_args[0][0] for call_args in mock_logger.error.call_args_list]
+            assert any("Max retries exceeded" in log for log in error_logs)
+
+    async def test_async_no_retry_logs_when_max_retries_zero(self):
+        """Test that no retry logs are emitted in async loop when max_retries=0."""
+        mock_model = MagicMock()
+        mock_model._deserialize_avro.return_value = {"test": "data"}
+
+        async def failing_handler(_data):
+            raise Exception("Handler failed")
+
+        mock_consumer = MagicMock()
+
+        loop = AsyncConsumerLoop(
+            model=mock_model,
+            handler=failing_handler,
+            commit_strategy="after_processing",
+            max_retries=0,
+        )
+        loop._consumer = mock_consumer
+
+        mock_msg = MagicMock()
+        mock_msg.value.return_value = b"test_data"
+
+        with patch("flowodm.consumer.logger") as mock_logger:
+            await loop._process_message(mock_msg)
+
+            # Verify no warning logs about retry attempts
+            warning_logs = [call_args[0][0] for call_args in mock_logger.warning.call_args_list]
+            assert not any("attempt" in log for log in warning_logs)
+
+            # Verify no error logs about max retries exceeded
+            error_logs = [call_args[0][0] for call_args in mock_logger.error.call_args_list]
+            assert not any("Max retries exceeded" in log for log in error_logs)
 
 
 @pytest.mark.unit

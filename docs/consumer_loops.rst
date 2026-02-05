@@ -86,17 +86,21 @@ Provide a custom error handler. The handler receives three arguments:
 Retries
 -------
 
-Configure automatic retries:
+By default, retries are disabled (``max_retries=0``). To enable automatic retries,
+configure them explicitly:
 
 .. code-block:: python
 
    loop = ConsumerLoop(
        model=OrderEvent,
        handler=process_order,
-       max_retries=3,         # Retry up to 3 times
+       max_retries=3,         # Retry up to 3 times (default: 0, no retries)
        retry_delay=1.0,       # Wait 1 second between retries
        error_handler=handle_error,  # Called after all retries exhausted
    )
+
+When retries are disabled, failed messages are immediately passed to the error handler
+without retry-related log messages.
 
 Commit Strategies
 -----------------
@@ -331,7 +335,7 @@ Complete Microservice Example
            error_handler=handle_error,
            on_startup=on_startup,
            on_shutdown=on_shutdown,
-           max_retries=3,
+           max_retries=3,         # Enable retries (default: 0)
            retry_delay=1.0,
        )
 

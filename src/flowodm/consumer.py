@@ -54,7 +54,7 @@ class ConsumerLoop:
         on_startup: Callable[[], None] | None = None,
         on_shutdown: Callable[[], None] | None = None,
         commit_strategy: str = "before_processing",
-        max_retries: int = 3,
+        max_retries: int = 0,
         retry_delay: float = 1.0,
         poll_timeout: float = 1.0,
     ):
@@ -94,7 +94,7 @@ class ConsumerLoop:
         VALID_STRATEGIES = {"before_processing", "after_processing"}
         if commit_strategy not in VALID_STRATEGIES:
             raise ValueError(
-                f"Invalid commit_strategy: {commit_strategy}. " f"Must be one of {VALID_STRATEGIES}"
+                f"Invalid commit_strategy: {commit_strategy}. Must be one of {VALID_STRATEGIES}"
             )
 
         self.commit_strategy = commit_strategy
@@ -138,8 +138,7 @@ class ConsumerLoop:
         self._running = True
 
         logger.info(
-            f"Starting consumer loop for {self.model.__name__} "
-            f"on topic {self.model._get_topic()}"
+            f"Starting consumer loop for {self.model.__name__} on topic {self.model._get_topic()}"
         )
 
         try:
@@ -228,12 +227,14 @@ class ConsumerLoop:
 
             except Exception as e:
                 retries += 1
-                logger.warning(
-                    f"Error processing message (attempt {retries}/{self.max_retries + 1}): {e}"
-                )
+                if self.max_retries > 0:
+                    logger.warning(
+                        f"Error processing message (attempt {retries}/{self.max_retries + 1}): {e}"
+                    )
 
                 if retries > self.max_retries:
-                    logger.error(f"Max retries exceeded for message: {e}")
+                    if self.max_retries > 0:
+                        logger.error(f"Max retries exceeded for message: {e}")
 
                     if self.error_handler:
                         try:
@@ -282,7 +283,7 @@ class AsyncConsumerLoop:
         on_shutdown: Callable[[], Awaitable[None]] | None = None,
         max_concurrent: int = 10,
         commit_strategy: str = "before_processing",
-        max_retries: int = 3,
+        max_retries: int = 0,
         retry_delay: float = 1.0,
         poll_timeout: float = 1.0,
     ):
@@ -324,7 +325,7 @@ class AsyncConsumerLoop:
         VALID_STRATEGIES = {"before_processing", "after_processing"}
         if commit_strategy not in VALID_STRATEGIES:
             raise ValueError(
-                f"Invalid commit_strategy: {commit_strategy}. " f"Must be one of {VALID_STRATEGIES}"
+                f"Invalid commit_strategy: {commit_strategy}. Must be one of {VALID_STRATEGIES}"
             )
 
         self.commit_strategy = commit_strategy
@@ -481,12 +482,14 @@ class AsyncConsumerLoop:
 
             except Exception as e:
                 retries += 1
-                logger.warning(
-                    f"Error processing message (attempt {retries}/{self.max_retries + 1}): {e}"
-                )
+                if self.max_retries > 0:
+                    logger.warning(
+                        f"Error processing message (attempt {retries}/{self.max_retries + 1}): {e}"
+                    )
 
                 if retries > self.max_retries:
-                    logger.error(f"Max retries exceeded for message: {e}")
+                    if self.max_retries > 0:
+                        logger.error(f"Max retries exceeded for message: {e}")
 
                     if self.error_handler:
                         try:
