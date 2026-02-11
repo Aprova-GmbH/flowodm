@@ -47,6 +47,9 @@ The inner ``Settings`` class configures Kafka-specific behavior:
    * - ``key_field``
      - No
      - Field name to use as message key
+   * - ``confluent_wire_format``
+     - No
+     - Prepend Confluent wire format header when serializing (default ``True``)
 
 Example with all settings:
 
@@ -64,26 +67,29 @@ Example with all settings:
        customer_id: str
        total: float
 
-Message ID
-----------
+Confluent Wire Format
+---------------------
 
-Every model instance automatically gets a unique ``message_id`` field:
+By default, FlowODM prepends the `Confluent wire format
+<https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format>`_
+header to serialized messages when a Schema Registry is configured. This header
+consists of a magic byte (``0x00``) followed by a 4-byte big-endian schema ID,
+making messages compatible with standard Confluent consumers, Java's
+``KafkaAvroDeserializer``, and Kafka UI tools like AKHQ and Kafdrop.
+
+When no Schema Registry is configured, messages are serialized as raw Avro bytes.
+
+To disable the wire format header (e.g., for custom consumers that expect raw Avro):
 
 .. code-block:: python
 
-   event = UserEvent(user_id="123", action="login", timestamp=datetime.now())
-   print(event.message_id)  # UUID-based unique identifier
+   class RawAvroEvent(FlowBaseModel):
+       class Settings:
+           topic = "raw-events"
+           confluent_wire_format = False  # Produce raw Avro bytes
 
-You can provide your own message ID:
-
-.. code-block:: python
-
-   event = UserEvent(
-       message_id="custom-id-123",
-       user_id="123",
-       action="login",
-       timestamp=datetime.now()
-   )
+       event_id: str
+       payload: str
 
 Optional Fields
 ---------------

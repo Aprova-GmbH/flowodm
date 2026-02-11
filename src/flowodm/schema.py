@@ -326,8 +326,7 @@ def _validate_model_against_schema(
             warnings.append(f"Missing optional field '{field_name}' from schema")
 
     # Check for extra fields (in model but not in schema)
-    # Exclude message_id which is FlowBaseModel's internal field
-    extra_fields = model_fields - schema_field_names - {"message_id"}
+    extra_fields = model_fields - schema_field_names
     for field_name in extra_fields:
         errors.append(f"Extra field '{field_name}' not in schema")
 

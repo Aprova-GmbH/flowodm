@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- `_to_avro_dict()` now converts `Enum` values to their plain `.value` before passing to fastavro
+
+### Removed
+- **BREAKING**: Removed auto-generated `message_id` field from `FlowBaseModel`. Users who need an ID field should add one manually to their model with `default_factory`.
+- Removed `generate_message_id()` function from public API
+
+### Migration Guide
+- If you relied on the automatic `message_id` field, add it to your model explicitly:
+  ```python
+  import uuid
+  class MyModel(FlowBaseModel):
+      id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+  ```
+
+### Added
+- Confluent wire format header (magic byte `0x00` + 4-byte schema ID) is now prepended to serialized Avro messages when a Schema Registry is configured ([#7](https://github.com/Aprova-GmbH/flowodm/issues/7), [#8](https://github.com/Aprova-GmbH/flowodm/pull/8))
+- New `confluent_wire_format` setting in the `Settings` class (default `True`) to control wire format header behavior
+- Schema ID caching per model class to avoid repeated Schema Registry calls during serialization
+
+### Fixed
+- Schema ID cache key now uses fully qualified class name (`module.qualname`) to prevent collisions between same-named classes in different modules
+
 ## [0.2.2] - 2026-02-05
 
 ### Changed
@@ -103,7 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `RealTimeSettings` - For event-driven, low-latency processing
   - `HighThroughputSettings` - For high-volume processing
   - `ReliableSettings` - For at-least-once delivery
-- UUID-based message ID generation with `generate_message_id()` function
+- UUID-based message ID generation with `generate_message_id()` function (removed in later release)
 - CLI tools for schema validation and Schema Registry operations
 - Comprehensive exception hierarchy for error handling
 - Graceful shutdown handling with signal support

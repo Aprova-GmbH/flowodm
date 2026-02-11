@@ -215,7 +215,6 @@ def sample_avro_schema():
             {"name": "user_id", "type": "string"},
             {"name": "action", "type": "string"},
             {"name": "timestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
-            {"name": "message_id", "type": "string"},
         ],
     }
 
@@ -231,7 +230,6 @@ def sample_user_event_bytes(sample_avro_schema):
         "user_id": "user-123",
         "action": "login",
         "timestamp": 1704067200000,  # 2024-01-01 00:00:00 UTC
-        "message_id": "msg-456",
     }
 
     output = io.BytesIO()

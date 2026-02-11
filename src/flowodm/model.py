@@ -8,14 +8,14 @@ from __future__ import annotations
 
 import io
 import struct
-import uuid
 from collections.abc import AsyncIterator, Iterator
 from datetime import datetime
+from enum import Enum
 from typing import Any, TypeVar
 
 import fastavro
 from confluent_kafka import Consumer, Message, Producer
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from flowodm.connection import (
     get_async_consumer,
@@ -48,11 +48,6 @@ CONFLUENT_MAGIC_BYTE = 0x00
 CONFLUENT_HEADER_SIZE = 5  # 1 byte magic + 4 bytes schema ID
 
 
-def generate_message_id() -> str:
-    """Generate a unique message ID using UUID4."""
-    return str(uuid.uuid4())
-
-
 class FlowBaseModel(BaseModel):
     """
     Base class for Kafka message models with ODM functionality.
@@ -75,9 +70,6 @@ class FlowBaseModel(BaseModel):
     """
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
-
-    # Optional message metadata
-    message_id: str = Field(default_factory=generate_message_id)
 
     class Settings:
         """
@@ -269,10 +261,11 @@ class FlowBaseModel(BaseModel):
         """Convert model to Avro-compatible dictionary."""
         data = self.model_dump(mode="python")
 
-        # Convert datetime to timestamp milliseconds
         for key, value in data.items():
             if isinstance(value, datetime):
                 data[key] = int(value.timestamp() * 1000)
+            elif isinstance(value, Enum):
+                data[key] = value.value
 
         return data
 
