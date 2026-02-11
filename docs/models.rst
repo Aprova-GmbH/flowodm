@@ -91,27 +91,6 @@ To disable the wire format header (e.g., for custom consumers that expect raw Av
        event_id: str
        payload: str
 
-Message ID
-----------
-
-Every model instance automatically gets a unique ``message_id`` field:
-
-.. code-block:: python
-
-   event = UserEvent(user_id="123", action="login", timestamp=datetime.now())
-   print(event.message_id)  # UUID-based unique identifier
-
-You can provide your own message ID:
-
-.. code-block:: python
-
-   event = UserEvent(
-       message_id="custom-id-123",
-       user_id="123",
-       action="login",
-       timestamp=datetime.now()
-   )
-
 Optional Fields
 ---------------
 

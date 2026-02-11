@@ -75,7 +75,7 @@ from flowodm.exceptions import (
 )
 
 # Core model
-from flowodm.model import FlowBaseModel, generate_message_id
+from flowodm.model import FlowBaseModel
 
 # Schema utilities
 from flowodm.schema import (
@@ -118,7 +118,6 @@ __all__ = [
     "get_schema_registry",
     # Model
     "FlowBaseModel",
-    "generate_message_id",
     # Consumer loops
     "ConsumerLoop",
     "AsyncConsumerLoop",

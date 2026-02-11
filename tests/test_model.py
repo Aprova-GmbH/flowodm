@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from flowodm import FlowBaseModel, generate_message_id
+from flowodm import FlowBaseModel
 from flowodm.exceptions import ConfigurationError, SettingsError
 from flowodm.model import CONFLUENT_HEADER_SIZE, CONFLUENT_MAGIC_BYTE, _schema_id_cache
 
@@ -56,7 +56,6 @@ class TestModelCreation:
         assert event.user_id == "user-123"
         assert event.action == "login"
         assert event.timestamp == datetime(2024, 1, 1, 12, 0, 0)
-        assert event.message_id is not None
 
     def test_model_with_optional_field(self):
         """Test model with optional field."""
@@ -78,22 +77,6 @@ class TestModelCreation:
         )
 
         assert event.metadata is None
-
-    def test_generate_message_id(self):
-        """Test message ID generation."""
-        id1 = generate_message_id()
-        id2 = generate_message_id()
-
-        assert id1 != id2
-        assert len(id1) == 36  # UUID format
-        assert "-" in id1
-
-    def test_message_id_auto_generated(self):
-        """Test that message_id is auto-generated."""
-        event1 = MinimalModel(name="test1")
-        event2 = MinimalModel(name="test2")
-
-        assert event1.message_id != event2.message_id
 
 
 @pytest.mark.unit
@@ -152,7 +135,29 @@ class TestSerialization:
         assert data["user_id"] == "user-123"
         assert data["action"] == "login"
         assert isinstance(data["timestamp"], int)  # Should be epoch ms
-        assert data["message_id"] == event.message_id
+
+    def test_to_avro_dict_with_enum(self):
+        """Test that enum values are converted to plain values in Avro dict."""
+        from enum import Enum
+
+        class Color(str, Enum):
+            RED = "red"
+            GREEN = "green"
+            BLUE = "blue"
+
+        class EventWithEnum(FlowBaseModel):
+            class Settings:
+                topic = "enum-topic"
+
+            name: str
+            color: Color
+
+        event = EventWithEnum(name="test", color=Color.RED)
+        data = event._to_avro_dict()
+
+        assert data["color"] == "red"
+        assert isinstance(data["color"], str)
+        assert not isinstance(data["color"], Enum)
 
     def test_from_avro_dict(self):
         """Test creating model from Avro dict."""
@@ -160,7 +165,6 @@ class TestSerialization:
             "user_id": "user-456",
             "action": "logout",
             "timestamp": 1704110400000,  # 2024-01-01 12:00:00 UTC
-            "message_id": "msg-789",
         }
 
         event = UserEvent._from_avro_dict(data)
@@ -168,7 +172,6 @@ class TestSerialization:
         assert event.user_id == "user-456"
         assert event.action == "logout"
         assert isinstance(event.timestamp, datetime)
-        assert event.message_id == "msg-789"
 
     def test_get_message_key(self):
         """Test getting message key from key_field."""
@@ -201,11 +204,10 @@ class TestSchemaGeneration:
 
         assert schema["type"] == "record"
         assert schema["name"] == "MinimalModel"
-        assert len(schema["fields"]) == 2  # name + message_id
+        assert len(schema["fields"]) == 1  # name only
 
         field_names = [f["name"] for f in schema["fields"]]
         assert "name" in field_names
-        assert "message_id" in field_names
 
     def test_generate_avro_schema_with_types(self):
         """Test schema generation preserves types."""
@@ -383,7 +385,6 @@ class TestSerializationErrors:
         result = MinimalModel._deserialize_avro(data)
 
         assert result.name == "test"
-        assert result.message_id == event.message_id
 
     def test_strip_confluent_header(self):
         """Test stripping Confluent wire format header."""
@@ -428,7 +429,6 @@ class TestSerializationErrors:
         result = MinimalModel._deserialize_avro(confluent_data)
 
         assert result.name == "confluent_test"
-        assert result.message_id == event.message_id
 
     def test_get_avro_schema_from_path(self, tmp_path):
         """Test loading schema from file path."""
@@ -440,7 +440,6 @@ class TestSerializationErrors:
             "name": "TestModel",
             "fields": [
                 {"name": "name", "type": "string"},
-                {"name": "message_id", "type": "string"},
             ],
         }
 
@@ -748,7 +747,7 @@ class TestConfluentWireFormat:
 
             name: str
 
-        event2 = WireFormatModel(name="test", message_id=event.message_id)
+        event2 = WireFormatModel(name="test")
         with patch("flowodm.model.get_schema_registry", return_value=mock_schema_registry):
             data_with_header = event2._serialize_avro()
 
@@ -765,7 +764,6 @@ class TestConfluentWireFormat:
         result = MinimalModel._deserialize_avro(data)
 
         assert result.name == "roundtrip_test"
-        assert result.message_id == event.message_id
 
     def test_schema_id_caching(self, mock_schema_registry):
         """Verify register_schema is called only once for multiple serializations."""

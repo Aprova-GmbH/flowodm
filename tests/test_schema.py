@@ -92,7 +92,6 @@ class TestValidation:
                 {"name": "user_id", "type": "string"},
                 {"name": "name", "type": "string"},
                 {"name": "age", "type": ["null", "long"]},
-                {"name": "message_id", "type": "string"},
             ],
         }
 
@@ -110,7 +109,6 @@ class TestValidation:
                 {"name": "user_id", "type": "string"},
                 {"name": "name", "type": "string"},
                 {"name": "email", "type": "string"},  # Missing in model
-                {"name": "message_id", "type": "string"},
             ],
         }
 
@@ -126,7 +124,6 @@ class TestValidation:
             "name": "SampleModel",
             "fields": [
                 {"name": "user_id", "type": "string"},
-                {"name": "message_id", "type": "string"},
                 # Missing 'name' and 'age' that are in model
             ],
         }
@@ -145,7 +142,6 @@ class TestValidation:
                 {"name": "user_id", "type": "string"},
                 {"name": "name", "type": "string"},
                 {"name": "age", "type": ["null", "long"]},
-                {"name": "message_id", "type": "string"},
                 {"name": "optional_extra", "type": ["null", "string"], "default": None},
             ],
         }
@@ -271,7 +267,7 @@ class TestGenerateModelFromSchema:
         assert Model.__name__ == "TestEvent"
         assert Model._get_topic() == "test-topic"
         # Create instance to verify fields
-        instance = Model(event_id="123", count=42, message_id="test-id")
+        instance = Model(event_id="123", count=42)
         assert instance.event_id == "123"
         assert instance.count == 42
 
@@ -289,7 +285,7 @@ class TestGenerateModelFromSchema:
         }
 
         Model = generate_model_from_schema(schema, topic="test-topic")
-        instance = Model(event_id="123", message_id="test-id")
+        instance = Model(event_id="123")
         assert instance.optional_field is None
 
     def test_generate_from_schema_file(self, tmp_path):
@@ -415,7 +411,6 @@ class TestValidationErrors:
             "name": "WrongTypeModel",
             "fields": [
                 {"name": "user_id", "type": "string"},  # Expects string
-                {"name": "message_id", "type": "string"},
             ],
         }
 

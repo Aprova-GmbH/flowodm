@@ -150,7 +150,6 @@ flowodm/
 **ODM Model** (`src/flowodm/model.py`)
 - `FlowBaseModel`: Pydantic v2 base class
 - Dual API: sync methods + async methods (prefixed with `a`)
-- Auto-generated `message_id` field
 - Avro serialization/deserialization
 
 **Schema Utilities** (`src/flowodm/schema.py`)
