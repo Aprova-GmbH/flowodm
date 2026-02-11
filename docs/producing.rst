@@ -146,6 +146,20 @@ Customize producer settings via ``connect()``:
        }
    )
 
+Wire Format
+-----------
+
+When a Schema Registry is configured, produced messages include the standard
+Confluent wire format header (magic byte + 4-byte schema ID). This ensures
+compatibility with Confluent consumers, Java's ``KafkaAvroDeserializer``, and
+Kafka UI tools (AKHQ, Kafdrop, etc.).
+
+The schema ID is cached per model class, so only the first serialization
+triggers a registry call.
+
+To disable the wire format header, set ``confluent_wire_format = False`` in
+your model's ``Settings`` class. See :doc:`models` for details.
+
 Error Handling
 --------------
 

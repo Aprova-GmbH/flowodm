@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Confluent wire format header (magic byte `0x00` + 4-byte schema ID) is now prepended to serialized Avro messages when a Schema Registry is configured ([#7](https://github.com/Aprova-GmbH/flowodm/issues/7), [#8](https://github.com/Aprova-GmbH/flowodm/pull/8))
+- New `confluent_wire_format` setting in the `Settings` class (default `True`) to control wire format header behavior
+- Schema ID caching per model class to avoid repeated Schema Registry calls during serialization
+
+### Fixed
+- Schema ID cache key now uses fully qualified class name (`module.qualname`) to prevent collisions between same-named classes in different modules
+
 ## [0.2.2] - 2026-02-05
 
 ### Changed
