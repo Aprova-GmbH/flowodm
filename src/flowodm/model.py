@@ -165,7 +165,7 @@ class FlowBaseModel(BaseModel):
         Raises:
             ConfigurationError: If no Schema Registry is configured
         """
-        cache_key = cls.__name__
+        cache_key = f"{cls.__module__}.{cls.__qualname__}"
         if cache_key not in _schema_id_cache:
             _schema_id_cache[cache_key] = cls.register_schema()
         return _schema_id_cache[cache_key]
