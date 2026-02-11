@@ -138,9 +138,9 @@ class TestSerialization:
 
     def test_to_avro_dict_with_enum(self):
         """Test that enum values are converted to plain values in Avro dict."""
-        from enum import Enum
+        from enum import StrEnum
 
-        class Color(str, Enum):
+        class Color(StrEnum):
             RED = "red"
             GREEN = "green"
             BLUE = "blue"
@@ -157,7 +157,7 @@ class TestSerialization:
 
         assert data["color"] == "red"
         assert isinstance(data["color"], str)
-        assert not isinstance(data["color"], Enum)
+        assert not isinstance(data["color"], StrEnum)
 
     def test_from_avro_dict(self):
         """Test creating model from Avro dict."""
