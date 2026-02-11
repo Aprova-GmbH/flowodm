@@ -7,6 +7,7 @@ Provides both synchronous and asynchronous methods for produce/consume operation
 from __future__ import annotations
 
 import io
+import struct
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from datetime import datetime
@@ -24,6 +25,7 @@ from flowodm.connection import (
     get_schema_registry,
 )
 from flowodm.exceptions import (
+    ConfigurationError,
     DeserializationError,
     ProducerError,
     SerializationError,
@@ -32,6 +34,10 @@ from flowodm.exceptions import (
 from flowodm.settings import BaseSettings
 
 T = TypeVar("T", bound="FlowBaseModel")
+
+# Cache for schema IDs keyed by class name, stored at module level
+# to avoid Pydantic treating it as a model attribute
+_schema_id_cache: dict[str, int] = {}
 
 # Confluent wire format constants
 # Confluent Kafka messages use a wire format with:
@@ -95,6 +101,8 @@ class FlowBaseModel(BaseModel):
         """Key serialization format: "string", "avro", "json" """
         value_serializer: str = "avro"
         """Value serialization format: "avro", "json" """
+        confluent_wire_format: bool = True
+        """Prepend Confluent wire format header (magic byte + schema ID) when serializing"""
 
     # ==================== Class Methods for Configuration ====================
 
@@ -137,6 +145,30 @@ class FlowBaseModel(BaseModel):
         """Get schema path from Settings."""
         settings = getattr(cls, "Settings", None)
         return getattr(settings, "schema_path", None) if settings else None
+
+    @classmethod
+    def _get_confluent_wire_format(cls) -> bool:
+        """Get confluent_wire_format setting (defaults to True)."""
+        settings = getattr(cls, "Settings", None)
+        return getattr(settings, "confluent_wire_format", True) if settings else True
+
+    @classmethod
+    def _get_or_register_schema_id(cls) -> int:
+        """
+        Get or register the schema ID for this model.
+
+        Uses a module-level cache to avoid repeated registry calls.
+
+        Returns:
+            Schema ID from registry
+
+        Raises:
+            ConfigurationError: If no Schema Registry is configured
+        """
+        cache_key = cls.__name__
+        if cache_key not in _schema_id_cache:
+            _schema_id_cache[cache_key] = cls.register_schema()
+        return _schema_id_cache[cache_key]
 
     @classmethod
     def _get_avro_schema(cls) -> dict[str, Any]:
@@ -256,11 +288,25 @@ class FlowBaseModel(BaseModel):
         return cls.model_validate(data)
 
     def _serialize_avro(self) -> bytes:
-        """Serialize model to Avro bytes."""
+        """Serialize model to Avro bytes.
+
+        When confluent_wire_format is enabled (default) and a Schema Registry
+        is configured, prepends the 5-byte Confluent wire format header
+        (magic byte 0x00 + 4-byte big-endian schema ID) before the Avro data.
+        """
         schema = self._get_avro_schema()
         data = self._to_avro_dict()
 
         output = io.BytesIO()
+
+        # Prepend Confluent wire format header if enabled and registry available
+        if self._get_confluent_wire_format():
+            try:
+                schema_id = self._get_or_register_schema_id()
+                output.write(struct.pack(">bI", CONFLUENT_MAGIC_BYTE, schema_id))
+            except ConfigurationError:
+                pass  # No Schema Registry configured → raw Avro
+
         try:
             fastavro.schemaless_writer(output, schema, data)
             return output.getvalue()
