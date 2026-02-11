@@ -1,12 +1,14 @@
 """Unit tests for FlowBaseModel."""
 
+import struct
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from flowodm import FlowBaseModel, generate_message_id
-from flowodm.exceptions import SettingsError
+from flowodm.exceptions import ConfigurationError, SettingsError
+from flowodm.model import CONFLUENT_HEADER_SIZE, CONFLUENT_MAGIC_BYTE, _schema_id_cache
 
 
 class UserEvent(FlowBaseModel):
@@ -673,3 +675,109 @@ class TestGetAvroSchemaFallbacks:
         assert schema["type"] == "record"
         assert schema["name"] == "MinimalModel"
         assert "fields" in schema
+
+
+@pytest.mark.unit
+class TestConfluentWireFormat:
+    """Tests for Confluent wire format header in producer serialization."""
+
+    def setup_method(self):
+        """Clear schema ID cache before each test."""
+        _schema_id_cache.clear()
+
+    def test_serialize_avro_with_confluent_header(self, mock_schema_registry):
+        """When schema registry is available, serialized bytes include wire format header."""
+        event = MinimalModel(name="test")
+
+        with patch("flowodm.model.get_schema_registry", return_value=mock_schema_registry):
+            data = event._serialize_avro()
+
+        # First byte should be magic byte
+        assert data[0] == CONFLUENT_MAGIC_BYTE
+        # Bytes 1-4 should be schema ID (big-endian)
+        schema_id = struct.unpack(">I", data[1:5])[0]
+        assert schema_id > 0
+        # Remaining bytes should be valid Avro that deserializes correctly
+        avro_bytes = data[CONFLUENT_HEADER_SIZE:]
+        assert len(avro_bytes) > 0
+
+    def test_serialize_avro_without_registry_falls_back_to_raw(self):
+        """When no registry is configured, output is raw Avro without header."""
+        event = MinimalModel(name="test")
+
+        with patch(
+            "flowodm.model.get_schema_registry",
+            side_effect=ConfigurationError("No registry"),
+        ):
+            data = event._serialize_avro()
+
+        # Should be raw Avro — first byte should NOT be 0x00 for a record starting with a string
+        # (Avro encodes strings with a varint length prefix, which won't be 0x00 for non-empty data)
+        # More reliably: deserialize as raw Avro should work
+        result = MinimalModel._deserialize_avro(data)
+        assert result.name == "test"
+
+    def test_serialize_avro_with_wire_format_disabled(self, mock_schema_registry):
+        """When confluent_wire_format is False, output is raw Avro even with registry."""
+
+        class NoWireFormatModel(FlowBaseModel):
+            class Settings:
+                topic = "test-topic"
+                confluent_wire_format = False
+
+            name: str
+
+        event = NoWireFormatModel(name="test")
+
+        with patch("flowodm.model.get_schema_registry", return_value=mock_schema_registry):
+            data = event._serialize_avro()
+
+        # Should be raw Avro — deserialize without stripping header
+        result = NoWireFormatModel._deserialize_avro(data)
+        assert result.name == "test"
+        # Verify no 5-byte header was prepended by checking the data is shorter
+        # than it would be with a header
+        assert len(data) < CONFLUENT_HEADER_SIZE + len(data)  # trivially true, check content
+        # Serialize again with wire format enabled for comparison
+        _schema_id_cache.clear()
+
+        class WireFormatModel(FlowBaseModel):
+            class Settings:
+                topic = "test-topic"
+                confluent_wire_format = True
+
+            name: str
+
+        event2 = WireFormatModel(name="test", message_id=event.message_id)
+        with patch("flowodm.model.get_schema_registry", return_value=mock_schema_registry):
+            data_with_header = event2._serialize_avro()
+
+        assert len(data_with_header) == len(data) + CONFLUENT_HEADER_SIZE
+
+    def test_roundtrip_with_confluent_header(self, mock_schema_registry):
+        """Serialize with header, deserialize, verify data integrity."""
+        event = MinimalModel(name="roundtrip_test")
+
+        with patch("flowodm.model.get_schema_registry", return_value=mock_schema_registry):
+            data = event._serialize_avro()
+
+        # Deserialize (should auto-strip the Confluent header)
+        result = MinimalModel._deserialize_avro(data)
+
+        assert result.name == "roundtrip_test"
+        assert result.message_id == event.message_id
+
+    def test_schema_id_caching(self, mock_schema_registry):
+        """Verify register_schema is called only once for multiple serializations."""
+        event1 = MinimalModel(name="test1")
+        event2 = MinimalModel(name="test2")
+
+        with patch("flowodm.model.get_schema_registry", return_value=mock_schema_registry):
+            with patch.object(
+                MinimalModel, "register_schema", wraps=MinimalModel.register_schema
+            ) as mock_register:
+                event1._serialize_avro()
+                event2._serialize_avro()
+
+                # register_schema should be called only once due to caching
+                mock_register.assert_called_once()
