@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-02-12
+
+### Fixed
+- `register_schema()` now uses `_get_avro_schema()` which respects the schema resolution priority (file -> registry -> auto-generate), preventing NAME_MISMATCH errors when the Schema Registry already has a schema with a different namespace ([#11](https://github.com/Aprova-GmbH/flowodm/pull/11))
+
 ## [0.3.0] - 2026-02-11
 
 ### Fixed

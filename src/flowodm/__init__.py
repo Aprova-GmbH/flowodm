@@ -35,7 +35,7 @@ Example:
 Apache Kafka is a registered trademark of the Apache Software Foundation.
 """
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 # Connection management
 from flowodm.connection import (
