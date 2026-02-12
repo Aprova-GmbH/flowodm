@@ -779,3 +779,62 @@ class TestConfluentWireFormat:
 
                 # register_schema should be called only once due to caching
                 mock_register.assert_called_once()
+
+
+@pytest.mark.unit
+class TestRegisterSchemaUsesFileSchema:
+    """Tests that register_schema uses the same schema resolution as serialization."""
+
+    def setup_method(self):
+        """Clear schema ID cache before each test."""
+        _schema_id_cache.clear()
+
+    def test_register_schema_uses_schema_from_file(self, tmp_path, mock_schema_registry):
+        """register_schema should use schema from file when schema_path is set."""
+        import json
+
+        schema_file = tmp_path / "engine.avsc"
+        file_schema = {
+            "type": "record",
+            "name": "Engine",
+            "namespace": "ch.helvetia.spl.mcc.model.kafka",
+            "fields": [
+                {"name": "case_id", "type": "string"},
+            ],
+        }
+        with open(schema_file, "w") as f:
+            json.dump(file_schema, f)
+
+        path_str = str(schema_file)
+
+        class EngineModel(FlowBaseModel):
+            class Settings:
+                topic = "ch-spl-mcc.engine"
+                schema_subject = "ch-spl-mcc.engine-value"
+                schema_path = path_str
+
+            case_id: str
+
+        with patch("flowodm.model.get_schema_registry", return_value=mock_schema_registry):
+            schema_id = EngineModel.register_schema()
+
+        assert schema_id > 0
+        # Verify the schema registered was the one from file, not auto-generated
+        registered = mock_schema_registry._schemas["ch-spl-mcc.engine-value"]
+        registered_str = registered["schema"].schema_str
+        registered_schema = json.loads(registered_str)
+        assert registered_schema["name"] == "Engine"
+        assert registered_schema["namespace"] == "ch.helvetia.spl.mcc.model.kafka"
+
+    def test_register_schema_falls_back_to_auto_generate(self, mock_schema_registry):
+        """register_schema should auto-generate when no schema_path is set."""
+        import json
+
+        with patch("flowodm.model.get_schema_registry", return_value=mock_schema_registry):
+            schema_id = MinimalModel.register_schema()
+
+        assert schema_id > 0
+        registered = mock_schema_registry._schemas["minimal-topic-value"]
+        registered_str = registered["schema"].schema_str
+        registered_schema = json.loads(registered_str)
+        assert registered_schema["name"] == "MinimalModel"
