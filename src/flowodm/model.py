@@ -747,6 +747,9 @@ class FlowBaseModel(BaseModel):
         """
         Register Avro schema with Schema Registry.
 
+        Uses the same schema resolution as serialization (file → registry → auto-generate)
+        to ensure the registered schema matches what is used for producing messages.
+
         Returns:
             Schema ID from registry
         """
@@ -754,7 +757,7 @@ class FlowBaseModel(BaseModel):
 
         registry = get_schema_registry()
         subject = cls._get_schema_subject()
-        schema = cls._generate_avro_schema()
+        schema = cls._get_avro_schema()
 
         import json
 
